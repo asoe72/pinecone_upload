@@ -21,6 +21,7 @@ async function askQuestion(openai, index, query) {
 
   // ChatGPT에 전달
   console.log(`openai.chat.completions.create()`);
+  console.log(`   ; Please, wait about 10~20 seconds...`);
   const completion = await openai.chat.completions.create({
     model: "gpt-4o-mini",
     messages: [

@@ -4,18 +4,26 @@ import fs from "fs";
 
 // --------------------------------------------------------
 /// @param[in]    pathnameBookshelves   e.g. '_test/bookshelves.json'
+/// @return       metadatas
 // --------------------------------------------------------
 export function loadMetadatasFromBookshelves(pathnameBookshelves) {
 
+  console.log('');
+  console.log('==============================================');
+  console.log('[1/3] LOADING BOOKSHELVES:');
+
   try {
+    const metadatas = [];
+    
     const data = fs.readFileSync(pathnameBookshelves, 'utf-8');
 
     const bookshelves = JSON.parse(data);
 
     for(const bookshelf of bookshelves) {
-      loadMetadatasInBookshelf(bookshelf)
-
+      const metadatasSub = loadMetadatasInBookshelf(bookshelf)
+      metadatas.push(...metadatasSub);
     }
+    return metadatas;
   }
   catch(err) {
     console.error(`Failed to read or parse ${pathnameBookshelves}`, err.message);
@@ -30,14 +38,15 @@ export function loadMetadatasFromBookshelves(pathnameBookshelves) {
 //                  - prefix      (optional) e.g. 'doc-'
 //                  - type        'folders' or 'files'
 //                  - exts        대상 확장자. e.g. ['txt', 'md', 'json']
+/// @return       metadatas
 // --------------------------------------------------------
 export function loadMetadatasInBookshelf(bookshelf) {
 
   if (bookshelf.type == 'folders') {
-    loadMetadatasInBookshelf_Folders(bookshelf);
+    return loadMetadatasInBookshelf_Folders(bookshelf);
   }
   else if (bookshelf.type == 'files') {
-    //loadMetadatasInGroup_Files(bookshelf);
+    return [];    //loadMetadatasInGroup_Files(bookshelf);
   }
 }
 
@@ -152,14 +161,14 @@ function chunkText(text, chunkSize = 500, overlap = 50) {
 /// @param[in]   lpathChapter      e.g. 'doc-add-axes/1-Introduction'
 /// @return   metadata; 한 chapter 분량의 정보를 모은 upsert용 객체
 ///           text는 아직 chunk 단위 분할을 하기 전 상태
-///           { "text": pathChapter 이하 모든 폴더의 .md들을 합친 text,
-///             "title": pathChapter의 README.md의 # 레벨 제목
-///             "source": pathChapter/README.md"
+///           { "text": lpathChapter 이하 모든 폴더의 .md들을 합친 text,
+///             "title": lpathChapter의 README.md의 # 레벨 제목
+///             "source": 출처
 ///           }
 ///           e.g.
 ///           { "text": "# 2. 운전\n\n운전은 로봇에게 작업 내용을...",
 ///             "title": "2. 운전"
-///             "source": "doc-hi6-operation-ko-tp630/2-operation/README.md"
+///             "source": e.g. "https://hrbook-hrc.web.app/#/view/doc-hi6-operation/korean-tp630/2-operation/README"
 ///           }
 // --------------------------------------------------------
 export function loadMetadataInChapter(bookshelf, lpathChapter) {
