@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import OpenAI from 'openai';
 import { Pinecone } from '@pinecone-database/pinecone';
-import { upload } from './upload.js';
+import { upload, upload2 } from './upload.js';
 import { ask } from './ask.js';
 import { printElapsedTime } from './elapsed.js';
 
@@ -49,6 +49,13 @@ console.log('pinecone_upload');
 console.log('programmed by Choi, Won-hyuk');
 console.log('v1.0.0');
 console.log('--------------------------------------------------');
+
+// test
+upload2('_test/bookshelves.json');
+process.exit(0);
+
+
+
 
 const start = Date.now();
 

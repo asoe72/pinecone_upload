@@ -1,4 +1,4 @@
-import { loadTextAll } from './load_txts.js';
+import { loadTextAll, loadMetadatasFromBookshelves } from './load_txts.js';
 import { printProgressBar } from './progress_bar.js';
 
 
@@ -71,4 +71,13 @@ export const upload = async (openai, index, lpath) => {
   await uploadToPinecone(openai, index, chunks);
 
   return index;
+};
+
+
+// --------------------------------------------------------
+export const upload2 = async (pathnameBookshelves) => {
+
+  //console.log('loadMetadatasInFolder test');
+  const metadatas = loadMetadatasFromBookshelves(pathnameBookshelves);
+  console.log(`N.metadata = ${metadatas.length}`);
 };

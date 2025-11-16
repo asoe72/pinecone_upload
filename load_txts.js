@@ -3,32 +3,301 @@ import fs from "fs";
 
 
 // --------------------------------------------------------
-function loadText(pathname) {
-  console.log(`loadTest(${pathname});`);
-  return fs.readFileSync(pathname, "utf-8");
+/// @param[in]    pathnameBookshelves   e.g. '_test/bookshelves.json'
+// --------------------------------------------------------
+export function loadMetadatasFromBookshelves(pathnameBookshelves) {
+
+  try {
+    const data = fs.readFileSync(pathnameBookshelves, 'utf-8');
+
+    const bookshelves = JSON.parse(data);
+
+    for(const bookshelf of bookshelves) {
+      loadMetadatasInBookshelf(bookshelf)
+
+    }
+  }
+  catch(err) {
+    console.error(`Failed to read or parse ${pathnameBookshelves}`, err.message);
+    return -1;
+  }
 }
 
 
 // --------------------------------------------------------
-export function loadTextAll(lpath) {
+/// @param[in]    bookshelf
+//                  - basepath    'R:/git_repo/doc'
+//                  - prefix      (optional) e.g. 'doc-'
+//                  - type        'folders' or 'files'
+//                  - exts        대상 확장자. e.g. ['txt', 'md', 'json']
+// --------------------------------------------------------
+export function loadMetadatasInBookshelf(bookshelf) {
 
-  // 폴더 내의 파일 이름 모두 읽기
-  const fnames = fs.readdirSync(lpath);
+  if (bookshelf.type == 'folders') {
+    loadMetadatasInBookshelf_Folders(bookshelf);
+  }
+  else if (bookshelf.type == 'files') {
+    //loadMetadatasInGroup_Files(bookshelf);
+  }
+}
+
+
+// --------------------------------------------------------
+/// @param[in]    bookshelf
+//                  - basepath    'R:/git_repo/doc'
+//                  - prefix      (optional) e.g. 'doc-'
+//                  - type        'folders' or 'files'
+//                  - exts        대상 확장자. e.g. ['txt', 'md', 'json']
+/// @return       metadatas
+// --------------------------------------------------------
+export function loadMetadatasInBookshelf_Folders(bookshelf) {
+
+  const metadatas = [];
+
+  // 하위 폴더 탐색; book 들이 모인 최상위 경로 (e.g. "R:/git_repo/doc")
+  const entries = fs.readdirSync(bookshelf.basepath, { withFileTypes: true });
+  for (const entry of entries) {
+    if (entry.isDirectory() == false) continue;
+
+    const folderName = entry.name;    // e.g. 'doc-add-axes'
+
+    // 폴더명 접두어 필터링
+    if(bookshelf.prefix) {
+      if (folderName.startsWith(bookshelf.prefix)==false) continue;
+    }
+    
+    const metadatasSub = loadMetadatasInBook(bookshelf, folderName);
+    metadatas.push(...metadatasSub);
+  }
+
+  return metadatas;
+}
+
+
+// --------------------------------------------------------
+/// @param[in]    bookshelf
+/// @param[in]    lpathBook       e.g. 'doc-add-axes'
+/// @return       metadatas
+// --------------------------------------------------------
+export function loadMetadatasInBook(bookshelf, lpathBook) {
+
+  console.log('==============================================');
+  console.log(`loadMetadatasInBook(${lpathBook})`);
+
+  const folderNames = [];
+
+  const pathBook = path.join(bookshelf.basepath, lpathBook);
+  console.log(`pathBook=${pathBook}`);
+
+  // 하위 chapter 폴더들 탐색하여 folderNames[]에 수집
+  const entries = fs.readdirSync(pathBook, { withFileTypes: true });
+  for (const entry of entries) {
+    if (entry.isDirectory()) {
+      const chapterFolderName = entry.name;
+      if (chapterFolderName.startsWith('.') || chapterFolderName == '_assets') continue;  // .git, 그림폴더 등 제외
+      folderNames.push(chapterFolderName);
+    }
+  }
+
+  // book 폴더 내의 모든 chapter 폴더들에 대해, metadata들 생성하여 metadatas[]에 넣는다.
+  const metadatas = [];
+  for (const folderName of folderNames) {
+    const lpathChapter = path.join(lpathBook, folderName);
+    const metadata = loadMetadataInChapter(bookshelf, lpathChapter);
+
+    // metadata.text를 분할해 여러 개의 metadata들을 만들어 넣는다.
+    const metadatasSub = splitMetadata(metadata);
+    metadatas.push(...metadatasSub);
+  }
+
+  return metadatas;
+}
+
+
+// --------------------------------------------------------
+/// @brief    metadata.text를 chunk 크기로 나눠, 여러 metadata로 복제하여,
+///           metadatas 배열에 push 후 리턴
+// --------------------------------------------------------
+export function splitMetadata(metadata) {
+ 
+  const metadatas = [];
+  const chunks = chunkText(metadata.text);
+
+  // metadata.text를 chunk 크기로 나눠, 여러 metadata로 복제
+  for (const chunk of chunks) {
+    const metadataCopy = {...metadata};
+    metadataCopy.text = chunk;    // 분할된
+    metadatas.push(metadataCopy);
+  }
+
+  return metadatas;
+}
+
+
+// --------------------------------------------------------
+function chunkText(text, chunkSize = 500, overlap = 50) {
+  console.log(`      chunkText();`);
+  const words = text.split(/\s+/);
+  const chunks = [];
+  for (let i = 0; i < words.length; i += chunkSize - overlap) {
+    chunks.push(words.slice(i, i + chunkSize).join(" "));
+  }
+  console.log(`        done ; chunks.length = ${chunks.length}`);
+  return chunks;
+}
+
+
+// --------------------------------------------------------
+/// @param[in]   bookshelf
+/// @param[in]   lpathChapter      e.g. 'doc-add-axes/1-Introduction'
+/// @return   metadata; 한 chapter 분량의 정보를 모은 upsert용 객체
+///           text는 아직 chunk 단위 분할을 하기 전 상태
+///           { "text": pathChapter 이하 모든 폴더의 .md들을 합친 text,
+///             "title": pathChapter의 README.md의 # 레벨 제목
+///             "source": pathChapter/README.md"
+///           }
+///           e.g.
+///           { "text": "# 2. 운전\n\n운전은 로봇에게 작업 내용을...",
+///             "title": "2. 운전"
+///             "source": "doc-hi6-operation-ko-tp630/2-operation/README.md"
+///           }
+// --------------------------------------------------------
+export function loadMetadataInChapter(bookshelf, lpathChapter) {
+
+  console.log('------------------------------------');
+  console.log(`loadMetadataInChapter(${lpathChapter})`);
+
+  const metadata = {};
+
+  // chapter 본문
+  metadata.text = loadTextAll(bookshelf, lpathChapter);
   
-  let combinedText = '';
+  // chapter 출처
+  metadata.source = makeSourceUrl(lpathChapter);
 
-  for (const fname of fnames) {
-    const ext = fname.substring(fname.lastIndexOf('.') + 1);
-    if (ext != 'txt') continue;
+  // chapter 제목
+  const abspathChapter = path.join(bookshelf.basepath, lpathChapter);
+  metadata.title = readTitleOfReadme(abspathChapter);
+  
+  console.log(`  - metadata.title=${metadata.title}`);
+  console.log(`  - metadata.source=${metadata.source}`);
+  console.log(`  - metadata.text=${metadata.text.substring(0, 100)}...`);
 
-    const pathname = path.join(lpath, fname);
+  //console.log(`loadMetadataInChapter(${pathChapter}):\n  ${JSON.stringify(metadata, null, 2)}\n\n`);
+  return metadata;
+}
 
-    // 파일인지 확인 (하위 폴더는 제외)
-    if (fs.statSync(pathname).isFile()) {
-      const content = loadText(pathname);
-      combinedText += content + "\n"; // 파일 사이 구분용 줄바꿈 추가
+
+// --------------------------------------------------------
+export function makeSourceUrl(lpathChapter) {
+  const lpath = lpathChapter.replaceAll('\\', '/');
+  const parts = lpath.split('/');
+  if (parts.length < 1) return '';
+  const branchName = 'korean';
+  parts.splice(1, 0, branchName);
+  parts.push('README');
+  const subPath = parts.join('/');
+  const source = 'https://hrbook-hrc.web.app/#/view/' + subPath;
+  return source;
+}
+
+
+// --------------------------------------------------------
+export function readTitleOfReadme(abspathChapter) {
+
+  const pathnameReadme = path.join(abspathChapter, 'README.md');
+  //console.log(`pathnameReadme=${pathnameReadme}`);
+
+  try {
+    const textReadme = fs.readFileSync(pathnameReadme, 'utf-8');
+    //console.log(`textReadme=${textReadme}`);
+  
+    // 정규식으로 제목(#) 추출
+    const lines = textReadme.split('/\r?\n/');
+
+    for (const line of lines) {
+      const match = line.match(/#\s*(.*)/);
+      if (match) {
+        return match[1].trim();
+      }
+    }
+  }
+  catch(err) {
+  }
+  console.log(`no title`);
+  
+  return '';
+}
+
+
+// --------------------------------------------------------
+/// @param[in]   bookshelf
+/// @param[in]   lpath      e.g. 'doc-add-axes/1-Introduction'
+/// @return       lpath 이하 폴더 구조의 모든 .md 파일을 합친 text
+// --------------------------------------------------------
+export function loadTextAll(bookshelf, lpath) {
+  
+  // 현재 폴더에서 파일 처리
+  let combinedText = loadTextAllInFolder(bookshelf, lpath);
+
+  // 하위 폴더 재귀 탐색
+  const abspath = path.join(bookshelf.basepath, lpath);
+  const entries = fs.readdirSync(abspath, { withFileTypes: true });
+  for (const entry of entries) {
+    if (entry.isDirectory()) {
+      if (entry.name.startsWith('.')) continue;
+      const lpathSub = path.join(lpath, entry.name);
+      const text = loadTextAll(bookshelf, lpathSub);   // 재귀 호출
+      combinedText += (text ? '\n' : '') + text;
     }
   }
 
   return combinedText;
+}
+
+
+// --------------------------------------------------------
+/// @param[in]   lpath     e.g. 'doc-add-axes/1-Introduction'
+/// @return      lpath 폴더의 모든 .md 파일을 합친 text
+// --------------------------------------------------------
+export function loadTextAllInFolder(bookshelf, lpath) {
+
+  // 폴더 내의 파일 이름 모두 읽기
+  const abspath = path.join(bookshelf.basepath, lpath);
+  const fnames = fs.readdirSync(abspath);
+
+  let combinedText = '';
+
+  for (const fname of fnames) {
+
+    const fnameLo = fname.toLowerCase();
+
+    // 파일명 필터링
+    if (bookshelf.excludeFiles) {
+      if (bookshelf.excludeFiles.includes(fnameLo)) continue;
+    }
+
+    // 확장자 필터링
+    if (bookshelf.exts) {
+      const ext = fnameLo.substring(fnameLo.lastIndexOf('.') + 1);
+      if (bookshelf.exts.includes(ext) == false) continue;
+    }
+
+    const pathname = path.join(bookshelf.basepath, lpath, fname);
+
+    // 파일인지 확인 (하위 폴더는 제외)
+    if (fs.statSync(pathname).isFile()) {
+      const text = loadText(pathname);
+      combinedText += (text ? '\n' : '') + text;    // 파일 사이 구분용 줄바꿈 추가
+    }
+  }
+
+  return combinedText.trim();
+}
+
+
+// --------------------------------------------------------
+function loadText(pathname) {
+  console.log(`      loadText(${pathname});`);
+  return fs.readFileSync(pathname, "utf-8");
 }
