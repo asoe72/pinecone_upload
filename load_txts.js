@@ -98,6 +98,9 @@ export function loadMetadatasInBook(bookshelf, lpathBook) {
   const pathBook = path.join(bookshelf.basepath, lpathBook);
   console.log(`pathBook=${pathBook}`);
 
+  // 책 제목 등 정보
+  const bookinfo = bookinfoFromBookPath(pathBook);
+
   // 하위 chapter 폴더들 탐색하여 folderNames[]에 수집
   const entries = fs.readdirSync(pathBook, { withFileTypes: true });
   for (const entry of entries) {
@@ -113,6 +116,8 @@ export function loadMetadatasInBook(bookshelf, lpathBook) {
   for (const folderName of folderNames) {
     const lpathChapter = path.join(lpathBook, folderName);
     const metadata = loadMetadataInChapter(bookshelf, lpathChapter);
+    copyMetadataFromBookInfo(metadata, bookinfo);   // 책 정보를 각 metadata에 첨부한다.
+    printMetadata(metadata);
 
     // metadata.text를 분할해 여러 개의 metadata들을 만들어 넣는다.
     const metadatasSub = splitMetadata(metadata);
@@ -120,6 +125,50 @@ export function loadMetadatasInBook(bookshelf, lpathBook) {
   }
 
   return metadatas;
+}
+
+
+// --------------------------------------------------------
+/// @param[in]    bookpath    'R:\git_repo\doc\doc-spot-weld'
+/// @return       bookinfo    { "langCode": "ko", series: "현대로봇 Hi6 제어기", title: "기능설명서 - 스폿 용접", .. }
+// --------------------------------------------------------
+function bookinfoFromBookPath(bookpath) {
+
+  const pathnameBookinfo = path.join(bookpath, 'bookinfo.json');
+  //console.log(`pathnameBookinfo=${pathnameBookinfo}`);
+
+  try {
+    const data = fs.readFileSync(pathnameBookinfo, 'utf-8');
+    //console.log(`data=${data}`);
+  
+    const bookinfo = JSON.parse(data);
+    return bookinfo;
+  }
+  catch(err) {
+    console.error(`Failed to read or parse ${pathnameBookinfo}`, err.message);
+    return null;
+  }
+}
+
+
+// --------------------------------------------------------
+export function copyMetadataFromBookInfo(metadata, bookinfo)
+{
+  if(!bookinfo) return;
+  metadata.langCode = bookinfo.langCode;
+  metadata.bookSeries = bookinfo.series;
+  metadata.bookTitle = bookinfo.title;
+}
+
+
+// --------------------------------------------------------
+export function printMetadata(metadata)
+{  
+  console.log(`  - metadata.bookSeries=${metadata.bookSeries}`);
+  console.log(`  - metadata.bookTitle=${metadata.bookTitle}`);
+  console.log(`  - metadata.chapterTitle=${metadata.chapterTitle}`);
+  console.log(`  - metadata.source=${metadata.source}`);
+  console.log(`  - metadata.text=${metadata.text.substring(0, 100)}...`);
 }
 
 
@@ -186,11 +235,7 @@ export function loadMetadataInChapter(bookshelf, lpathChapter) {
 
   // chapter 제목
   const abspathChapter = path.join(bookshelf.basepath, lpathChapter);
-  metadata.title = readTitleOfReadme(abspathChapter);
-  
-  console.log(`  - metadata.title=${metadata.title}`);
-  console.log(`  - metadata.source=${metadata.source}`);
-  console.log(`  - metadata.text=${metadata.text.substring(0, 100)}...`);
+  metadata.chapterTitle = readTitleOfReadme(abspathChapter);
 
   //console.log(`loadMetadataInChapter(${pathChapter}):\n  ${JSON.stringify(metadata, null, 2)}\n\n`);
   return metadata;

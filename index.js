@@ -13,7 +13,7 @@ function printGreeting() {
   console.log('--------------------------------------------------');
   console.log('pinecone_upload');
   console.log('programmed by Choi, Won-hyuk');
-  console.log('v1.1.0');
+  console.log('v1.2.0');
   console.log('--------------------------------------------------');
 }
 
