@@ -3,6 +3,7 @@ import OpenAI from 'openai';
 import { createIndexOfPineconeIfNot, upload } from './vector_db.js';
 import { ask } from './ask.js';
 import { printElapsedTime } from './elapsed.js';
+import { cloneRepos } from './clone_docs.js';
 
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -42,6 +43,8 @@ async function testAsking() {
 
 printGreeting();
 
-const index = await createIndexOfPineconeIfNot();
-await upload(openai, index, process.env.PATHNAME_BOOKSHELVES);
-await testAsking();
+await cloneRepos();
+
+//const index = await createIndexOfPineconeIfNot();
+//await upload(openai, index, process.env.PATHNAME_BOOKSHELVES);
+//await testAsking();

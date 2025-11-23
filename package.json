@@ -12,6 +12,7 @@
   "description": "",
   "dependencies": {
     "@pinecone-database/pinecone": "^6.1.2",
+    "child_process": "^1.0.2",
     "dotenv": "^17.2.2",
     "openai": "^5.22.0"
   }
