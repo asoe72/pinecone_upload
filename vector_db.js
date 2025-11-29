@@ -1,7 +1,7 @@
 import { Pinecone } from '@pinecone-database/pinecone';
 import { loadMetadatasFromBookshelves } from './load_txts.js';
 import { printProgressBar } from './util/progress_bar.js';
-import { printElapsedTime } from './elapsed.js';
+import { printElapsedTime } from './util/elapsed.js';
 
 
 const pc = new Pinecone({ apiKey: process.env.PINECONE_API_KEY });
@@ -51,7 +51,7 @@ export const upload = async (openai, index, pathnameBookshelves) => {
   const metadatas = await loadMetadatasFromBookshelves(pathnameBookshelves);
 
   // 개수 제한 (시험용)
-  //const n_max = 40;
+  //const n_max = 20;
   //metadatas.length = n_max;
 
   // vector DB에 upload

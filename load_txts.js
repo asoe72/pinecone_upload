@@ -1,6 +1,7 @@
 import path from "path";
 import fs from "fs";
 import { fetchHRBookInfos } from './bookinfos.js';
+import { colorStrRed } from './util/color_str.js';
 
 
 // --------------------------------------------------------
@@ -27,7 +28,7 @@ export async function loadMetadatasFromBookshelves(pathnameBookshelves) {
     return metadatas;
   }
   catch(err) {
-    console.error(`Failed to read or parse ${pathnameBookshelves}`, err.message);
+    console.error(colorStrRed(`Failed to read or parse ${pathnameBookshelves}\n`), err.message);
     return -1;
   }
 }
@@ -66,23 +67,35 @@ export async function loadMetadatasInBookshelf_Folders(bookshelf) {
   const bookinfos = await fetchHRBookInfos();
 
   let idx = 0;
+  let n_ok = 0;
+  let n_skip = 0;
 
   // bookinfos 항목 중 일부 filter-out 하고 load
   for (const bookinfo of bookinfos) {
   
-    if(filterBookinfo(bookinfo) == false) continue;
+    if(filterBookinfo(bookinfo) == false) {
+      n_skip++;
+      continue;
+    }
 
     idx++;
 		//if(idx < 99) continue;
-    if(idx > 1) break;
+    //if(idx > 8) break;
 
-    console.log(`book_id:${bookinfo.book_id}, ver_id:${bookinfo.ver_id}, shelf_ids:${JSON.stringify(bookinfo.shelf_ids)}`);
+    //console.log(`book_id:${bookinfo.book_id}, ver_id:${bookinfo.ver_id}, shelf_ids:${JSON.stringify(bookinfo.shelf_ids)}`);
 
-    const folderName = bookinfo.book_id + '-' + bookinfo.ver_id;    // e.g. 'doc-add-axes'
-
-    const metadatasSub = loadMetadatasInBook(bookshelf, folderName);
+    const metadatasSub = loadMetadatasInBook(bookshelf, bookinfo);
+    if(metadatasSub == null) {
+      n_skip++;
+      continue;
+    }
     metadatas.push(...metadatasSub);
+    n_ok++;
   }
+
+  console.log('--------------------------------------------------');
+  console.log(`TOTAL BOOKS = ${bookinfos.length}`)
+  console.log(`N.OK = ${n_ok}, N.SKIP = ${n_skip}`)
 
   return metadatas;
 }
@@ -101,21 +114,26 @@ function filterBookinfo(bookinfo) {
 
 // --------------------------------------------------------
 /// @param[in]    bookshelf
-/// @param[in]    lpathBook       e.g. 'doc-add-axes'
 /// @return       metadatas
 // --------------------------------------------------------
-export function loadMetadatasInBook(bookshelf, lpathBook) {
+export function loadMetadatasInBook(bookshelf, bookinfo) {
+
+  const _bookFolderName = bookFolderName(bookinfo);    // e.g. 'doc-add-axes-korean'
 
   console.log('==============================================');
-  console.log(`loadMetadatasInBook(${lpathBook})`);
+  console.log(`loadMetadatasInBook(${_bookFolderName})`);
 
   const folderNames = [];
 
-  const pathBook = path.join(bookshelf.basepath, lpathBook);
+  const pathBook = path.join(bookshelf.basepath, _bookFolderName);
   console.log(`pathBook=${pathBook}`);
 
   // 책 제목 등 정보
-  const bookinfo = bookinfoFromBookPath(pathBook);
+  const bookinfoInBook = bookinfoFromBookPath(pathBook);
+  if(bookinfoInBook == null) {
+    return null;
+  }
+  Object.assign(bookinfo, bookinfoInBook); // bookinfos.json의 각 info에, 개별 폴더의 bookinfo.json을 합함.
 
   // 하위 chapter 폴더들 탐색하여 folderNames[]에 수집
   const entries = fs.readdirSync(pathBook, { withFileTypes: true });
@@ -130,8 +148,10 @@ export function loadMetadatasInBook(bookshelf, lpathBook) {
   // book 폴더 내의 모든 chapter 폴더들에 대해, metadata들 생성하여 metadatas[]에 넣는다.
   const metadatas = [];
   for (const folderName of folderNames) {
-    const lpathChapter = path.join(lpathBook, folderName);
-    const metadata = loadMetadataInChapter(bookshelf, lpathChapter);
+    if(folderName.startsWith('.')) continue;    // .git/ 등은 skip
+    if(bookshelf.excludeFolders.includes(folderName)) continue;
+    //@@const metadata = loadMetadataInChapter(bookshelf, bookinfo, rpathChapter);
+    const metadata = loadMetadataInChapter(bookshelf, bookinfo, folderName);
     copyMetadataFromBookInfo(metadata, bookinfo);   // 책 정보를 각 metadata에 첨부한다.
     printMetadata(metadata);
 
@@ -141,6 +161,15 @@ export function loadMetadatasInBook(bookshelf, lpathBook) {
   }
 
   return metadatas;
+}
+
+
+// --------------------------------------------------------
+/// @return       e.g. 'doc-add-axes-korean'
+// --------------------------------------------------------
+function bookFolderName(bookinfo) {
+
+  return bookinfo.book_id + '-' + bookinfo.ver_id;
 }
 
 
@@ -157,11 +186,14 @@ function bookinfoFromBookPath(bookpath) {
     const data = fs.readFileSync(pathnameBookinfo, 'utf-8');
     //console.log(`data=${data}`);
   
-    const bookinfo = JSON.parse(data);
+    // UTF-8 BOM 제거
+    const dataNoBom = data.replace(/^\uFEFF/, '');
+
+    const bookinfo = JSON.parse(dataNoBom);
     return bookinfo;
   }
   catch(err) {
-    console.error(`Failed to read or parse ${pathnameBookinfo}`, err.message);
+    console.error(colorStrRed(`Failed to read or parse ${pathnameBookinfo}\n`), err.message);
     return null;
   }
 }
@@ -223,11 +255,13 @@ function chunkText(text, chunkSize = 500, overlap = 50) {
 
 // --------------------------------------------------------
 /// @param[in]   bookshelf
-/// @param[in]   lpathChapter      e.g. 'doc-add-axes/1-Introduction'
+/// @param[in]   bookinfo
+/// @param[in]   folderName     e.g. '1-Introduction'
+/// @param[in]   rpathChapter      e.g. 'doc-add-axes/1-Introduction'
 /// @return   metadata; 한 chapter 분량의 정보를 모은 upsert용 객체
 ///           text는 아직 chunk 단위 분할을 하기 전 상태
-///           { "text": lpathChapter 이하 모든 폴더의 .md들을 합친 text,
-///             "title": lpathChapter의 README.md의 # 레벨 제목
+///           { "text": rpathChapter 이하 모든 폴더의 .md들을 합친 text,
+///             "title": rpathChapter의 README.md의 # 레벨 제목
 ///             "source": 출처
 ///           }
 ///           e.g.
@@ -236,21 +270,24 @@ function chunkText(text, chunkSize = 500, overlap = 50) {
 ///             "source": e.g. "https://hrbook-hrc.web.app/#/view/doc-hi6-operation/korean-tp630/2-operation/README"
 ///           }
 // --------------------------------------------------------
-export function loadMetadataInChapter(bookshelf, lpathChapter) {
+export function loadMetadataInChapter(bookshelf, bookinfo, folderName) {
+
+  const _bookFolderName = bookFolderName(bookinfo);    // e.g. 'doc-add-axes-korean'
+  const rpathChapter = path.join(_bookFolderName, folderName);
 
   console.log('------------------------------------');
-  console.log(`loadMetadataInChapter(${lpathChapter})`);
+  console.log(`loadMetadataInChapter(${rpathChapter})`);
 
   const metadata = {};
 
   // chapter 본문
-  metadata.text = loadTextAll(bookshelf, lpathChapter);
+  metadata.text = loadTextAll(bookshelf, rpathChapter);
   
   // chapter 출처
-  metadata.source = makeSourceUrl(lpathChapter);
+  metadata.source = makeSourceUrl(bookinfo, folderName);
 
   // chapter 제목
-  const abspathChapter = path.join(bookshelf.basepath, lpathChapter);
+  const abspathChapter = path.join(bookshelf.basepath, rpathChapter);
   metadata.chapterTitle = readTitleOfReadme(abspathChapter);
 
   //console.log(`loadMetadataInChapter(${pathChapter}):\n  ${JSON.stringify(metadata, null, 2)}\n\n`);
@@ -259,15 +296,12 @@ export function loadMetadataInChapter(bookshelf, lpathChapter) {
 
 
 // --------------------------------------------------------
-export function makeSourceUrl(lpathChapter) {
-  const lpath = lpathChapter.replaceAll('\\', '/');
-  const parts = lpath.split('/');
-  if (parts.length < 1) return '';
-  const branchName = 'korean';
-  parts.splice(1, 0, branchName);
-  parts.push('README');
-  const subPath = parts.join('/');
-  const source = 'https://hrbook-hrc.web.app/#/view/' + subPath;
+/// @param[in]   folderName      e.g. '1-Introduction'
+/// @return     e.g. `https://hrbook-hrc.web.app/#/view/doc-add-axes/korean/1-Introduction/README`
+// --------------------------------------------------------
+export function makeSourceUrl(bookinfo, folderName) {
+  const subPath = `${bookinfo.book_id}/${bookinfo.ver_id}/${folderName}/README`;
+  const source = `https://hrbook-hrc.web.app/#/view/` + subPath;
   return source;
 }
 
@@ -302,22 +336,22 @@ export function readTitleOfReadme(abspathChapter) {
 
 // --------------------------------------------------------
 /// @param[in]   bookshelf
-/// @param[in]   lpath      e.g. 'doc-add-axes/1-Introduction'
-/// @return       lpath 이하 폴더 구조의 모든 .md 파일을 합친 text
+/// @param[in]   rpath      e.g. 'doc-add-axes/1-Introduction'
+/// @return       rpath 이하 폴더 구조의 모든 .md 파일을 합친 text
 // --------------------------------------------------------
-export function loadTextAll(bookshelf, lpath) {
+export function loadTextAll(bookshelf, rpath) {
   
   // 현재 폴더에서 파일 처리
-  let combinedText = loadTextAllInFolder(bookshelf, lpath);
+  let combinedText = loadTextAllInFolder(bookshelf, rpath);
 
   // 하위 폴더 재귀 탐색
-  const abspath = path.join(bookshelf.basepath, lpath);
+  const abspath = path.join(bookshelf.basepath, rpath);
   const entries = fs.readdirSync(abspath, { withFileTypes: true });
   for (const entry of entries) {
     if (entry.isDirectory()) {
       if (entry.name.startsWith('.')) continue;
-      const lpathSub = path.join(lpath, entry.name);
-      const text = loadTextAll(bookshelf, lpathSub);   // 재귀 호출
+      const rpathSub = path.join(rpath, entry.name);
+      const text = loadTextAll(bookshelf, rpathSub);   // 재귀 호출
       combinedText += (text ? '\n' : '') + text;
     }
   }
@@ -327,13 +361,13 @@ export function loadTextAll(bookshelf, lpath) {
 
 
 // --------------------------------------------------------
-/// @param[in]   lpath     e.g. 'doc-add-axes/1-Introduction'
-/// @return      lpath 폴더의 모든 .md 파일을 합친 text
+/// @param[in]   rpath     e.g. 'doc-add-axes/1-Introduction'
+/// @return      rpath 폴더의 모든 .md 파일을 합친 text
 // --------------------------------------------------------
-export function loadTextAllInFolder(bookshelf, lpath) {
+export function loadTextAllInFolder(bookshelf, rpath) {
 
   // 폴더 내의 파일 이름 모두 읽기
-  const abspath = path.join(bookshelf.basepath, lpath);
+  const abspath = path.join(bookshelf.basepath, rpath);
   const fnames = fs.readdirSync(abspath);
 
   let combinedText = '';
@@ -353,7 +387,7 @@ export function loadTextAllInFolder(bookshelf, lpath) {
       if (bookshelf.exts.includes(ext) == false) continue;
     }
 
-    const pathname = path.join(bookshelf.basepath, lpath, fname);
+    const pathname = path.join(bookshelf.basepath, rpath, fname);
 
     // 파일인지 확인 (하위 폴더는 제외)
     if (fs.statSync(pathname).isFile()) {

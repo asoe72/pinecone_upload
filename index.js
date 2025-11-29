@@ -2,7 +2,7 @@ import 'dotenv/config';
 import OpenAI from 'openai';
 import { createIndexOfPineconeIfNot, upload } from './vector_db.js';
 import { ask } from './ask.js';
-import { printElapsedTime } from './elapsed.js';
+import { printElapsedTime } from './util/elapsed.js';
 import { cloneOrPullRepos } from './clone_docs.js';
 
 
