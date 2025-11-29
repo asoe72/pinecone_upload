@@ -48,7 +48,7 @@ export const upload = async (openai, index, pathnameBookshelves) => {
   const start = Date.now();
 
   // metadatas 생성
-  const metadatas = loadMetadatasFromBookshelves(pathnameBookshelves);
+  const metadatas = await loadMetadatasFromBookshelves(pathnameBookshelves);
 
   // 개수 제한 (시험용)
   //const n_max = 40;

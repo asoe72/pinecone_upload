@@ -14,7 +14,7 @@ function printGreeting() {
   console.log('--------------------------------------------------');
   console.log('pinecone_upload');
   console.log('programmed by Choi, Won-hyuk');
-  console.log('v1.2.0');
+  console.log('v1.3.0');
   console.log('--------------------------------------------------');
 }
 
@@ -44,8 +44,8 @@ async function testAsking() {
 printGreeting();
 
 const basePath = 'R:/git_repo/doc/';
-await cloneOrPullRepos(basePath);
+//await cloneOrPullRepos(basePath);
 
-//const index = await createIndexOfPineconeIfNot();
-//await upload(openai, index, process.env.PATHNAME_BOOKSHELVES);
+const index = await createIndexOfPineconeIfNot();
+await upload(openai, index, process.env.PATHNAME_BOOKSHELVES);
 //await testAsking();

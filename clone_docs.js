@@ -1,4 +1,5 @@
 import { exec } from "child_process";
+import { fetchHRBookInfos } from './bookinfos.js';
 import { startDotProgress } from './util/progress_bar.js';
 import { colorStrGreen, colorStrYellow, colorStrCyan } from './util/color_str.js';
 import path from "path";
@@ -6,10 +7,13 @@ import fs from "fs";
 
 
 // --------------------------------------------------------
+/// @param[in]    basePath		'R:/hrchatbot2_docs/hrbook/'
+/// @return		처리한 repo 개수
+// --------------------------------------------------------
 export async function cloneOrPullRepos(basePath) {
 	
-	const bookinfos = await fetchHRBookInfos();
 	const baseUrl = 'https://github.com/hyundai-robotics/';
+	const bookinfos = await fetchHRBookInfos();
 
 	// base 디렉토리가 없으면 생성
 	if (!fs.existsSync(basePath)) {
@@ -23,7 +27,7 @@ export async function cloneOrPullRepos(basePath) {
 		
 		// test range
 		idx++;
-		if(idx < 98) continue;
+		if(idx < 99) continue;
 		//if(idx > 60) break;
 		
 		const targetFolderName = info.book_id + '-' + info.ver_id;	// e.g. 'doc-spot-weld-korean'
@@ -40,6 +44,8 @@ export async function cloneOrPullRepos(basePath) {
 		
 		await cloneOrPullRepo(basePath, targetFolderName, url, branch);
 	}
+
+	return idxMax;
 }
 
 
@@ -55,33 +61,6 @@ function printCloneOrPullRepo(idx, idxMax, basePath, targetFolderName, url, bran
 `	- repoPath=${repoPath}
 	- url=${url}
 	- branch=${branch}\n`);
-}
-
-
-// --------------------------------------------------------
-/// @return		HRBOOK의 bookinfos.json의 json data
-// --------------------------------------------------------
-export async function fetchHRBookInfos() {
-
-	const url = 'https://hrcontentsrelay-bmgae5hdbzapc4bc.koreacentral-01.azurewebsites.net/api/proxy?path=hrbookinfos/refs/heads/master/bookinfos.json';
-
-	try {
-		const res = await fetch(url, {
-			method: "GET",
-			headers: { "Accept": "application/json" }
-		});
-
-		if (!res.ok) {
-			throw new Error(`Fetch failed: ${res.status} ${res.statusText}`);
-		}
-
-		const data = await res.json();
-		return data;
-	}
-	catch (e) {
-		console.error("Error fetching book infos:", e);
-		throw e;
-	}
 }
 
 

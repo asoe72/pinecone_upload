@@ -1,12 +1,13 @@
 import path from "path";
 import fs from "fs";
+import { fetchHRBookInfos } from './bookinfos.js';
 
 
 // --------------------------------------------------------
 /// @param[in]    pathnameBookshelves   e.g. '_test/bookshelves.json'
 /// @return       metadatas
 // --------------------------------------------------------
-export function loadMetadatasFromBookshelves(pathnameBookshelves) {
+export async function loadMetadatasFromBookshelves(pathnameBookshelves) {
 
   console.log('');
   console.log('==============================================');
@@ -20,7 +21,7 @@ export function loadMetadatasFromBookshelves(pathnameBookshelves) {
     const bookshelves = JSON.parse(data);
 
     for(const bookshelf of bookshelves) {
-      const metadatasSub = loadMetadatasInBookshelf(bookshelf)
+      const metadatasSub = await loadMetadatasInBookshelf(bookshelf)
       metadatas.push(...metadatasSub);
     }
     return metadatas;
@@ -35,15 +36,14 @@ export function loadMetadatasFromBookshelves(pathnameBookshelves) {
 // --------------------------------------------------------
 /// @param[in]    bookshelf
 //                  - basepath    'R:/git_repo/doc'
-//                  - prefix      (optional) e.g. 'doc-'
 //                  - type        'folders' or 'files'
 //                  - exts        대상 확장자. e.g. ['txt', 'md', 'json']
 /// @return       metadatas
 // --------------------------------------------------------
-export function loadMetadatasInBookshelf(bookshelf) {
+export async function loadMetadatasInBookshelf(bookshelf) {
 
   if (bookshelf.type == 'folders') {
-    return loadMetadatasInBookshelf_Folders(bookshelf);
+    return await loadMetadatasInBookshelf_Folders(bookshelf);
   }
   else if (bookshelf.type == 'files') {
     return [];    //loadMetadatasInGroup_Files(bookshelf);
@@ -54,32 +54,48 @@ export function loadMetadatasInBookshelf(bookshelf) {
 // --------------------------------------------------------
 /// @param[in]    bookshelf
 //                  - basepath    'R:/git_repo/doc'
-//                  - prefix      (optional) e.g. 'doc-'
 //                  - type        'folders' or 'files'
+//                  - excludeFiles  (optional) e.g. ["book.md", "bookinfo.json"..]
 //                  - exts        대상 확장자. e.g. ['txt', 'md', 'json']
 /// @return       metadatas
 // --------------------------------------------------------
-export function loadMetadatasInBookshelf_Folders(bookshelf) {
+export async function loadMetadatasInBookshelf_Folders(bookshelf) {
 
   const metadatas = [];
 
-  // 하위 폴더 탐색; book 들이 모인 최상위 경로 (e.g. "R:/git_repo/doc")
-  const entries = fs.readdirSync(bookshelf.basepath, { withFileTypes: true });
-  for (const entry of entries) {
-    if (entry.isDirectory() == false) continue;
+  const bookinfos = await fetchHRBookInfos();
 
-    const folderName = entry.name;    // e.g. 'doc-add-axes'
+  let idx = 0;
 
-    // 폴더명 접두어 필터링
-    if(bookshelf.prefix) {
-      if (folderName.startsWith(bookshelf.prefix)==false) continue;
-    }
-    
+  // bookinfos 항목 중 일부 filter-out 하고 load
+  for (const bookinfo of bookinfos) {
+  
+    if(filterBookinfo(bookinfo) == false) continue;
+
+    idx++;
+		//if(idx < 99) continue;
+    if(idx > 1) break;
+
+    console.log(`book_id:${bookinfo.book_id}, ver_id:${bookinfo.ver_id}, shelf_ids:${JSON.stringify(bookinfo.shelf_ids)}`);
+
+    const folderName = bookinfo.book_id + '-' + bookinfo.ver_id;    // e.g. 'doc-add-axes'
+
     const metadatasSub = loadMetadatasInBook(bookshelf, folderName);
     metadatas.push(...metadatasSub);
   }
 
   return metadatas;
+}
+
+
+// --------------------------------------------------------
+function filterBookinfo(bookinfo) {
+
+  if(bookinfo.ver_id.includes('korean') == false) return false;  // 한글버전만 포함,
+  if(bookinfo.ver_id.includes('tp600')) return false;            // tp600 제외
+  if(bookinfo.shelf_ids.includes('hi7-cont')) return false;      // hi7은 아직 제외,
+  
+  return true;
 }
 
 
