@@ -1,6 +1,6 @@
 import { Pinecone } from '@pinecone-database/pinecone';
 import { loadMetadatasFromBookshelves } from './load_txts.js';
-import { printProgressBar } from './progress_bar.js';
+import { printProgressBar } from './util/progress_bar.js';
 import { printElapsedTime } from './elapsed.js';
 
 
