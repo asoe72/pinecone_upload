@@ -1,13 +1,14 @@
 import { exec } from "child_process";
+import { startDotProgress } from './util/progress_bar.js';
+import { colorStrGreen, colorStrYellow, colorStrCyan } from './util/color_str.js';
 import path from "path";
 import fs from "fs";
 
 
 // --------------------------------------------------------
-export async function cloneOrPullRepos() {
+export async function cloneOrPullRepos(basePath) {
 	
 	const bookinfos = await fetchHRBookInfos();
-	const basePath = 'R:/hrchatbot2_docs/hrbook/';
 	const baseUrl = 'https://github.com/hyundai-robotics/';
 
 	// base 디렉토리가 없으면 생성
@@ -16,33 +17,44 @@ export async function cloneOrPullRepos() {
 	}
 
 	let idx = 0;
+	const idxMax = bookinfos.length;
+
 	for (const info of bookinfos) {
 		
-		if(idx > 2) break;	// for test
-
-		console.log('-------------------------------------');
-		console.log(`IDX = ${idx}/${bookinfos.length}`);
-
+		// test range
 		idx++;
+		if(idx < 98) continue;
+		//if(idx > 60) break;
 		
 		const targetFolderName = info.book_id + '-' + info.ver_id;	// e.g. 'doc-spot-weld-korean'
-		const _path = path.join(basePath, targetFolderName);
+		
 		const url = baseUrl + info.book_id + '.git';
 		const branch = info.ver_id;
 
-		console.log(
-`cloneRepo()
-	- path=${_path}
-	- url=${url}
-	- branch=${branch}\n`);
+		printCloneOrPullRepo(idx, idxMax, basePath, targetFolderName, url, branch);
 
 		if (info.url) {
-			console.log(': not git repo => skipped');
+			console.log(': not git repo => ' + colorStrYellow('SKIP'));
 			continue;
 		}		
 		
 		await cloneOrPullRepo(basePath, targetFolderName, url, branch);
 	}
+}
+
+
+// --------------------------------------------------------
+function printCloneOrPullRepo(idx, idxMax, basePath, targetFolderName, url, branch) {
+
+	const repoPath = path.join(basePath, targetFolderName);
+
+	console.log('---------------------------------------');
+	console.log(`[IDX ${idx}/${idxMax}] cloneOrPullRepo:`);
+
+	console.log(
+`	- repoPath=${repoPath}
+	- url=${url}
+	- branch=${branch}\n`);
 }
 
 
@@ -92,7 +104,7 @@ async function cloneOrPullRepo(basePath, targetFolderName, repoUrl, branch) {
 		// 로컬 변경 여부 확인
 		const hasChange = await hasLocalChanges(repoPath);
 		if(hasChange) {
-			console.log(': has local change => \x1b[31mSKIP\x1b[0m');
+			console.log(': has local change => ' + colorStrYellow('SKIP'));
 			return -1;
 		}
 
@@ -141,9 +153,9 @@ function pullRepo(repoPath) {
 					return;
 			}
 			if (stderr.trim().length > 0) {
-					console.error("  git log(STDERR):", stderr);
+					console.error("  git progress:", stderr);
 			}
-			console.log("  STDOUT:", stdout);
+			console.log("  git result:", colorStrCyan(stdout));
 			resolve({ stdout, stderr });
 		});
 	});
@@ -164,11 +176,18 @@ function cloneRepo(basePath, targetFolderName, repoUrl, branch) {
 		// basePath가 있을 경우 해당 경로로 이동해서 clone 실행
 		const cmd = `git -C "${basePath}" clone -b "${branch}" --single-branch "${repoUrl}" "${targetFolderName}"`;
 
+		process.stdout.write("  cloning : ");
+		const stopDotProgress = startDotProgress();
+
 		exec(cmd, (err, stdout, stderr) => {
+			
+			stopDotProgress();
 			if (err) {
 				reject(stderr || err.message);
 				return;
 			}
+			const msg = stdout ? colorStrCyan(stdout) : colorStrGreen('DONE');
+			console.log("  git result:",  msg);
 			resolve({ stdout, stderr });
 		});
 	});

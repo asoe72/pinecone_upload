@@ -43,7 +43,8 @@ async function testAsking() {
 
 printGreeting();
 
-await cloneOrPullRepos();
+const basePath = 'R:/git_repo/doc/';
+await cloneOrPullRepos(basePath);
 
 //const index = await createIndexOfPineconeIfNot();
 //await upload(openai, index, process.env.PATHNAME_BOOKSHELVES);
