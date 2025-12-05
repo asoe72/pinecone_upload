@@ -133,7 +133,7 @@ export function loadMetadatasInBook(bookshelf, bookinfo) {
   if(bookinfoInBook == null) {
     return null;
   }
-  Object.assign(bookinfo, bookinfoInBook); // bookinfos.json의 각 info에, 개별 폴더의 bookinfo.json을 합함.
+  Object.assign(bookinfo, bookinfoInBook); // bookinfos.json의 각 info 객체에, 개별 폴더의 bookinfo.json 객체를 합함.
 
   // 하위 chapter 폴더들 탐색하여 folderNames[]에 수집
   const entries = fs.readdirSync(pathBook, { withFileTypes: true });
@@ -148,6 +148,7 @@ export function loadMetadatasInBook(bookshelf, bookinfo) {
   // book 폴더 내의 모든 chapter 폴더들에 대해, metadata들 생성하여 metadatas[]에 넣는다.
   const metadatas = [];
   for (const folderName of folderNames) {
+
     if(folderName.startsWith('.')) continue;    // .git/ 등은 skip
     if(bookshelf.excludeFolders.includes(folderName)) continue;
     //@@const metadata = loadMetadataInChapter(bookshelf, bookinfo, rpathChapter);
@@ -159,6 +160,8 @@ export function loadMetadatasInBook(bookshelf, bookinfo) {
     const metadatasSub = splitMetadata(metadata);
     metadatas.push(...metadatasSub);
   }
+
+  finalizeMetadatas(bookinfo, metadatas);
 
   return metadatas;
 }
@@ -214,26 +217,36 @@ export function printMetadata(metadata)
 {  
   console.log(`  - metadata.bookSeries=${metadata.bookSeries}`);
   console.log(`  - metadata.bookTitle=${metadata.bookTitle}`);
-  console.log(`  - metadata.chapterTitle=${metadata.chapterTitle}`);
-  console.log(`  - metadata.source=${metadata.source}`);
   console.log(`  - metadata.text=${metadata.text.substring(0, 100)}...`);
+  console.log(`  - metadata N.bookmarks=${metadata.bookmarks.length}`);
 }
 
 
 // --------------------------------------------------------
 /// @brief    metadata.text를 chunk 크기로 나눠, 여러 metadata로 복제하여,
+///           chunk 범위 내의 bookmarks만 남기고,
 ///           metadatas 배열에 push 후 리턴
 // --------------------------------------------------------
 export function splitMetadata(metadata) {
  
+  if(metadata.bookmarks.length == 0) return [];
+
   const metadatas = [];
   const chunks = chunkText(metadata.text);
+  //const len = metadata.text.length;
+
+  let offsetSt = 0;
+  let lastBookmark = {};
 
   // metadata.text를 chunk 크기로 나눠, 여러 metadata로 복제
   for (const chunk of chunks) {
-    const metadataCopy = {...metadata};
+    const metadataCopy = structuredClone(metadata);
     metadataCopy.text = chunk;    // 분할된
+    metadataCopy.bookmarks = filteredBookmarks(metadataCopy.bookmarks, offsetSt, chunk.length);
+    lastBookmark = updateOrApplyLastBookmark(metadataCopy.bookmarks, lastBookmark);
+        
     metadatas.push(metadataCopy);
+    offsetSt += chunk.length;
   }
 
   return metadatas;
@@ -254,20 +267,63 @@ function chunkText(text, chunkSize = 500, overlap = 50) {
 
 
 // --------------------------------------------------------
+function filteredBookmarks(bookmarks, offsetSt, len) {
+
+  const bookmarksOut = [];
+  const offsetEn = offsetSt + len;
+
+  for (const bookmark of bookmarks) {
+
+    if(bookmark.offset < offsetSt) continue;
+    if(bookmark.offset >= offsetEn) continue;
+
+    bookmarksOut.push(bookmark);
+  }
+
+  return bookmarksOut;
+}
+
+
+// --------------------------------------------------------
+/// @param[in,out]   bookmarks
+/// @param[in]       lastBookmark  
+/// @return   updatedLastBookmark
+// --------------------------------------------------------
+function updateOrApplyLastBookmark(bookmarks, lastBookmark) {
+
+  let updatedLastBookmark = lastBookmark;
+
+  if(bookmarks.length == 0) {
+    bookmarks.push({...lastBookmark});    // bookmark가 하나도 없으면, 마지막 bookmark의 사본 넣어줌
+  }
+  else {
+    const lastIdx = bookmarks.length - 1;
+    updatedLastBookmark = {...bookmarks[lastIdx]};    // bookmark들이 있으면, 마지막 bookmark의 사본 보관
+  }
+
+  return updatedLastBookmark;
+}
+
+
+// --------------------------------------------------------
 /// @param[in]   bookshelf
 /// @param[in]   bookinfo
 /// @param[in]   folderName     e.g. '1-Introduction'
 /// @param[in]   rpathChapter      e.g. 'doc-add-axes/1-Introduction'
 /// @return   metadata; 한 chapter 분량의 정보를 모은 upsert용 객체
 ///           text는 아직 chunk 단위 분할을 하기 전 상태
-///           { "text": rpathChapter 이하 모든 폴더의 .md들을 합친 text,
-///             "title": rpathChapter의 README.md의 # 레벨 제목
-///             "source": 출처
+///           { text: rpathChapter 이하 모든 폴더의 .md들을 합친 text,
+///             bookmarks: {
+///               title: .md의 첫 행 # 레벨 제목
+///               rpath: 출처의 상대경로
+///             }
 ///           }
 ///           e.g.
 ///           { "text": "# 2. 운전\n\n운전은 로봇에게 작업 내용을...",
-///             "title": "2. 운전"
-///             "source": e.g. "https://hrbook-hrc.web.app/#/view/doc-hi6-operation/korean-tp630/2-operation/README"
+///             bookmarks: {
+///               title: "2. 운전"
+///               rpath: e.g. "2-operation/README"
+///             }
 ///           }
 // --------------------------------------------------------
 export function loadMetadataInChapter(bookshelf, bookinfo, folderName) {
@@ -279,16 +335,13 @@ export function loadMetadataInChapter(bookshelf, bookinfo, folderName) {
   console.log(`loadMetadataInChapter(${rpathChapter})`);
 
   const metadata = {};
+  metadata.text = '';
+  metadata.bookmarks = [];    // 폴더당 1개씩의 bookmark { offset, rpath, title }
 
   // chapter 본문
-  metadata.text = loadTextAll(bookshelf, rpathChapter);
+  loadTextAll(metadata, bookshelf, rpathChapter);
   
-  // chapter 출처
-  metadata.source = makeSourceUrl(bookinfo, folderName);
 
-  // chapter 제목
-  const abspathChapter = path.join(bookshelf.basepath, rpathChapter);
-  metadata.chapterTitle = readTitleOfReadme(abspathChapter);
 
   //console.log(`loadMetadataInChapter(${pathChapter}):\n  ${JSON.stringify(metadata, null, 2)}\n\n`);
   return metadata;
@@ -296,28 +349,61 @@ export function loadMetadataInChapter(bookshelf, bookinfo, folderName) {
 
 
 // --------------------------------------------------------
-/// @param[in]   folderName      e.g. '1-Introduction'
-/// @return     e.g. `https://hrbook-hrc.web.app/#/view/doc-add-axes/korean/1-Introduction/README`
-// --------------------------------------------------------
-export function makeSourceUrl(bookinfo, folderName) {
-  const subPath = `${bookinfo.book_id}/${bookinfo.ver_id}/${folderName}/README`;
-  const source = `https://hrbook-hrc.web.app/#/view/` + subPath;
-  return source;
+function finalizeMetadatas(bookinfo, metadatas) {
+
+  for(const metadata of metadatas) {
+    finalizeBookmarks(bookinfo, metadata);
+  }
 }
 
 
 // --------------------------------------------------------
-export function readTitleOfReadme(abspathChapter) {
+function finalizeBookmarks(bookinfo, metadata) {
 
-  const pathnameReadme = path.join(abspathChapter, 'README.md');
-  //console.log(`pathnameReadme=${pathnameReadme}`);
+  for(const bookmark of metadata.bookmarks) {
+    bookmark.source = makeSourceUrl(bookinfo, bookmark.rpath);
+    delete bookmark.offset;
+    delete bookmark.rpath;
+  }
+
+  // pinecone의 metadata key는 객체의 배열이 허용되지 않으므로, json 문자열로 변환
+  // (Metadata value must be a string, number, boolean or list of strings)
+  metadata.bookmarks = JSON.stringify(metadata.bookmarks);
+}
+
+
+// --------------------------------------------------------
+/// @param[in]   rpath      e.g. '1-Introduction' or '3-Setup/1-robottype/robottype.md'
+/// @return     e.g. `https://hrbook-hrc.web.app/#/view/doc-add-axes/korean/1-Introduction/README`
+// --------------------------------------------------------
+export function makeSourceUrl(bookinfo, rpath) {
+
+  const parts = rpath.split(/[\\/]/);
+  if(parts.length == 0) return '';
+  const parts2 = parts.slice(1);
+  const rpath2 = parts2.join('/');
+  
+  let subPath = `${bookinfo.book_id}/${bookinfo.ver_id}/${rpath2}`;
+  if(subPath.endsWith('.md') == false) {
+    subPath += '/README';
+  }
+  else {
+     subPath = subPath.replace(/\.md$/i, '');    // 맨 끝 .md 제거
+  }
+  const source = `https://hrbook-hrc.web.app/#/view/` + subPath;
+  return source.replace(/\\/g, "/");
+}
+
+
+// --------------------------------------------------------
+export function readTitleOfMdFile(pathname) {
 
   try {
-    const textReadme = fs.readFileSync(pathnameReadme, 'utf-8');
-    //console.log(`textReadme=${textReadme}`);
+    const text = loadText(pathname);
+    //console.log(`text=${text}`);
   
     // 정규식으로 제목(#) 추출
-    const lines = textReadme.split('/\r?\n/');
+    const lines = text.split('/\r?\n/');
 
     for (const line of lines) {
       const match = line.match(/#\s*(.*)/);
@@ -335,14 +421,15 @@ export function readTitleOfReadme(abspathChapter) {
 
 
 // --------------------------------------------------------
+/// @param[in,out]   metadata    정보를 추가할 metadata 객체
 /// @param[in]   bookshelf
 /// @param[in]   rpath      e.g. 'doc-add-axes/1-Introduction'
 /// @return       rpath 이하 폴더 구조의 모든 .md 파일을 합친 text
 // --------------------------------------------------------
-export function loadTextAll(bookshelf, rpath) {
+export function loadTextAll(metadata, bookshelf, rpath) {
   
-  // 현재 폴더에서 파일 처리
-  let combinedText = loadTextAllInFolder(bookshelf, rpath);
+  // 현재 폴더에서 파일 text load해서 누적
+  loadTextAllInFolder(metadata, bookshelf, rpath);
 
   // 하위 폴더 재귀 탐색
   const abspath = path.join(bookshelf.basepath, rpath);
@@ -351,26 +438,22 @@ export function loadTextAll(bookshelf, rpath) {
     if (entry.isDirectory()) {
       if (entry.name.startsWith('.')) continue;
       const rpathSub = path.join(rpath, entry.name);
-      const text = loadTextAll(bookshelf, rpathSub);   // 재귀 호출
-      combinedText += (text ? '\n' : '') + text;
+      loadTextAll(metadata, bookshelf, rpathSub);   // 재귀 호출
     }
   }
-
-  return combinedText;
 }
 
 
 // --------------------------------------------------------
+/// @param[in,out]   metadata    정보를 추가할 metadata 객체
+/// @param[in]   bookshelf
 /// @param[in]   rpath     e.g. 'doc-add-axes/1-Introduction'
-/// @return      rpath 폴더의 모든 .md 파일을 합친 text
 // --------------------------------------------------------
-export function loadTextAllInFolder(bookshelf, rpath) {
+export function loadTextAllInFolder(metadata, bookshelf, rpath) {
 
   // 폴더 내의 파일 이름 모두 읽기
   const abspath = path.join(bookshelf.basepath, rpath);
   const fnames = fs.readdirSync(abspath);
-
-  let combinedText = '';
 
   for (const fname of fnames) {
 
@@ -387,21 +470,53 @@ export function loadTextAllInFolder(bookshelf, rpath) {
       if (bookshelf.exts.includes(ext) == false) continue;
     }
 
-    const pathname = path.join(bookshelf.basepath, rpath, fname);
-
-    // 파일인지 확인 (하위 폴더는 제외)
-    if (fs.statSync(pathname).isFile()) {
-      const text = loadText(pathname);
-      combinedText += (text ? '\n' : '') + text;    // 파일 사이 구분용 줄바꿈 추가
-    }
+    loadTextAddBookmarkIfFile(metadata, bookshelf.basepath, rpath, fname);
   }
+}
 
-  return combinedText.trim();
+
+// --------------------------------------------------------
+/// @param[in,out]   metadata    정보를 추가할 metadata 객체
+/// @param[in]   basepath
+/// @param[in]   rpath     e.g. 'doc-add-axes/1-Introduction/'
+/// @param[in]   fname     e.g. 'README'
+// --------------------------------------------------------
+export function loadTextAddBookmarkIfFile(metadata, basepath, rpath, fname) {
+
+  const pathname = path.join(basepath, rpath, fname);
+
+  // 파일인지 확인 (폴더는 제외)
+  if (fs.statSync(pathname).isFile() == false) return 0;
+
+  // bookmark 생성, 추가
+  const bookmark = {};
+  bookmark.offset = metadata.text.length;
+  bookmark.rpath = path.join(rpath, fname);
+  bookmark.title = readTitleOfMdFile(pathname); 
+
+  const text = convToWordJoinedText(loadText(pathname));
+  if(text) {
+    metadata.text += (metadata.text ? ' ' : '') + text;    // 파일 사이 구분용 공백 추가
+  }
+  metadata.bookmarks.push(bookmark);
+
+  return 1;
+}
+
+
+// --------------------------------------------------------
+function convToWordJoinedText(text) {
+
+  const words = text.split(/\s+/);
+  return words.join(" ").trim();  
 }
 
 
 // --------------------------------------------------------
 function loadText(pathname) {
+
   console.log(`      loadText(${pathname});`);
-  return fs.readFileSync(pathname, "utf-8");
+  const text = fs.readFileSync(pathname, "utf-8");
+  const textNoBom = text.replace(/^\uFEFF/, '');  // UTF-8 BOM 제거
+  return textNoBom;
 }
