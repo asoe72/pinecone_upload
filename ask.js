@@ -75,6 +75,7 @@ export const ask = async (openai, index, question, options) => {
 const calcLogScoreOfExpectedId = async (index, vectorOfQuery, idExpected, pathname) => {
 
   const vectorExpected = await getVectorFromId(index, idExpected);
+  if (!vectorExpected) return -1;
   const score = scoreOfVectors(vectorOfQuery, vectorExpected);
   logStrToUtf8Bom(`score of ${idExpected} = ${score}\n`, pathname, false);
 }
@@ -85,12 +86,12 @@ const getVectorFromId = async (index, id) => {
 
   const res = await index.fetch([id]);
   
-  if (!res || !res.records) {
+  if (!res?.records) {
     console.error("fetch response invalid:", res);
     return null;
   }
   const record = res.records[id];
-  const values = record.values;
+  const values = record?.values;
 
   return values;
 }

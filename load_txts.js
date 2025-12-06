@@ -352,6 +352,7 @@ export function loadMetadataInChapter(bookshelf, bookinfo, folderName) {
 function finalizeMetadatas(bookinfo, metadatas) {
 
   for(const metadata of metadatas) {
+    insertSubjectsAtBeginningOfText(metadata);
     finalizeBookmarks(bookinfo, metadata);
   }
 }
@@ -369,6 +370,21 @@ function finalizeBookmarks(bookinfo, metadata) {
   // pinecone의 metadata key는 객체의 배열이 허용되지 않으므로, json 문자열로 변환
   // (Metadata value must be a string, number, boolean or list of strings)
   metadata.bookmarks = JSON.stringify(metadata.bookmarks);
+}
+
+
+// --------------------------------------------------------
+/// @brief    vector 검색 성능 개선을 위해, text 맨 앞에 title들을 subjects 정보로서 배치
+// --------------------------------------------------------
+function insertSubjectsAtBeginningOfText(metadata) {
+  
+  const titles = [];
+  for(const bookmark of metadata.bookmarks) {
+    titles.push(bookmark.title);
+  }
+  const strTitles = 'Subjects:\n' + titles.join(',\n');
+
+  metadata.text = strTitles + '\n\n' + metadata.text;
 }
 
 
