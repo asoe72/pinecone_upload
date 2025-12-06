@@ -11,15 +11,17 @@ async function askQuestion(openai, index, query, options) {
     input: query
   });
 
+  const vectorOfQuery = qEmb.data[0].embedding;
+
   // Pinecone 검색
   console.log(`index.query()`);
-  const results = await index.query({
+  const queryResults = await index.query({
     topK: 3,
-    vector: qEmb.data[0].embedding,
+    vector: vectorOfQuery,
     includeMetadata: true
   });
 
-  const context = results.matches.map(m => m.metadata.text).join("\n--------------\n");
+  const context = queryResults.matches.map(m => m.metadata.text).join("\n--------------\n");
 
   // ChatGPT에 전달
   console.log(`openai.chat.completions.create()`);
@@ -39,11 +41,25 @@ async function askQuestion(openai, index, query, options) {
 
   if(options?.doLog) {
     const pathname = 'messages.txt';
-    const str = JSON.stringify(messages) + '\n\n\n ANSWER ----------------\n' + answer;
-    logStrToUtf8Bom(str, pathname, true);
+    logStrToUtf8Bom('==== askQuestion() TEST ====\n', pathname, true);
+
+    logStrToUtf8Bom(`질문 (QUERY) : ${query}\n`, pathname, false);
+    logStrToUtf8Bom(`     vector : ${JSON.stringify(vectorOfQuery)}:\n`, pathname, false);
+  
+    logStrToUtf8Bom(`\nQUERY RESULTS : \n`, pathname, false);
+    let i=0;
+    for(const m of queryResults.matches) {
+      logStrToUtf8Bom(` \nQUERY RESULT [${i}]\n\n`, pathname, false);
+      logStrToUtf8Bom(`score=${m.score}\n`, pathname, false);
+      logStrToUtf8Bom(m.metadata.text, pathname, false);
+      i++;
+    }
+    logStrToUtf8Bom(`답변 (ANSWER) : ${answer}:\n\n\n`, pathname, false);
+
+    calcLogScoreOfExpectedId(index, vectorOfQuery, 'doc-216', pathname);
   }
 
-  return completion.choices[0].message.content;
+  return answer;
 }
 
 
@@ -52,4 +68,52 @@ export const ask = async (openai, index, question, options) => {
   
   const answer = await askQuestion(openai, index, question, options);
   console.log("답변:", answer);
+};
+
+
+// --------------------------------------------------------
+const calcLogScoreOfExpectedId = async (index, vectorOfQuery, idExpected, pathname) => {
+
+  const vectorExpected = await getVectorFromId(index, idExpected);
+  const score = scoreOfVectors(vectorOfQuery, vectorExpected);
+  logStrToUtf8Bom(`score of ${idExpected} = ${score}\n`, pathname, false);
+}
+
+
+// --------------------------------------------------------
+const getVectorFromId = async (index, id) => {
+
+  const res = await index.fetch([id]);
+  
+  if (!res || !res.records) {
+    console.error("fetch response invalid:", res);
+    return null;
+  }
+  const record = res.records[id];
+  const values = record.values;
+
+  return values;
+}
+
+
+// --------------------------------------------------------
+/// @return   score = (v1 v2) / ||v1|| ||v2||
+// --------------------------------------------------------
+const scoreOfVectors = (v1, v2) => {
+  // cosineSimilarity
+  if (v1.length !== v2.length) {
+    throw new Error("Vector dimensions must match");
+  }
+
+  let dot = 0;
+  let normA = 0;
+  let normB = 0;
+
+  for (let i = 0; i < v1.length; i++) {
+    dot += v1[i] * v2[i];
+    normA += v1[i] * v1[i];
+    normB += v2[i] * v2[i];
+  }
+
+  return dot / (Math.sqrt(normA) * Math.sqrt(normB));
 };

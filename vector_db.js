@@ -107,7 +107,7 @@ async function uploadToPinecone(openai, index, metadatas, options) {
     // embedding 생성
     const emb = await openai.embeddings.create({
       model: "text-embedding-3-small",
-      input: _metadata.text,
+      input: _metadata.bookmarks + '\n' + _metadata.text,
     });
 
     vectors.push({

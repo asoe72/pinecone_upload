@@ -14,7 +14,10 @@ const options = {};
 ///           => options={ opt1: 'hello', opt2: '99', ...}
 // --------------------------------------------------------
 function procArgs() {
-  const args = process.argv.slice(2);
+  
+  const str = '-skipClone -skipUpload -doLog';
+  const args = str.split(' ');
+  //const args = process.argv.slice(2);
   
   for (const a of args) {
     const [key, value] = a.split('=');

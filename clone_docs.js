@@ -27,7 +27,7 @@ export async function cloneOrPullRepos(basePath) {
 		
 		// test range
 		idx++;
-		if(idx < 99) continue;
+		//if(idx < 50) continue;
 		//if(idx > 60) break;
 		
 		const targetFolderName = info.book_id + '-' + info.ver_id;	// e.g. 'doc-spot-weld-korean'
@@ -94,8 +94,12 @@ async function cloneOrPullRepo(basePath, targetFolderName, repoUrl, branch) {
 
 	// 기존 폴더 있으면 clone
 	else {
-		const result = await cloneRepo(basePath, targetFolderName, repoUrl, branch);
-		return result;
+		try {
+			const result = await cloneRepo(basePath, targetFolderName, repoUrl, branch);
+			return result;
+		} catch(err) {
+			return err;
+		}
 	}
 }
 
