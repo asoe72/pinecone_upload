@@ -2,6 +2,7 @@ import { Pinecone } from '@pinecone-database/pinecone';
 import { loadMetadatasFromBookshelves } from './load_txts.js';
 import { printProgressBar } from './util/progress_bar.js';
 import { printElapsedTime } from './util/elapsed.js';
+import { logStrToUtf8Bom } from './util/log.js';
 
 
 const pc = new Pinecone({ apiKey: process.env.PINECONE_API_KEY });
@@ -43,7 +44,9 @@ export async function createIndexOfPineconeIfNot() {
 // --------------------------------------------------------
 /// @brief   최초 1회 문서 업로드 (이미 업로드 했다면 생략 가능)
 // --------------------------------------------------------
-export const upload = async (openai, index, pathnameBookshelves) => {
+export const upload = async (openai, index, pathnameBookshelves, options) => {
+
+  console.log('upload');
 
   const start = Date.now();
 
@@ -55,7 +58,14 @@ export const upload = async (openai, index, pathnameBookshelves) => {
   //metadatas.length = n_max;
 
   // vector DB에 upload
-  await uploadToPinecone(openai, index, metadatas);
+  if(options?.skipUploadToDb==undefined) {
+    await uploadToPinecone(openai, index, metadatas, options);
+  }
+
+  // log
+  if(options?.doLogDataToUpload) {
+    logDataToUpload(metadatas);
+  }
 
   // report
   console.log('');
@@ -80,7 +90,7 @@ export const upload = async (openai, index, pathnameBookshelves) => {
 ///             "source": e.g. "https://hrbook-hrc.web.app/#/view/doc-hi6-operation/korean-tp630/2-operation/README"
 ///           }
 // --------------------------------------------------------
-async function uploadToPinecone(openai, index, metadatas) {
+async function uploadToPinecone(openai, index, metadatas, options) {
   
   const n_metadata = metadatas.length;
 
@@ -113,7 +123,44 @@ async function uploadToPinecone(openai, index, metadatas) {
   process.stdout.write("\n");
   console.log(`   done ; n_metadata = ${n_metadata}`);
 
-  await upsertVectors(index, vectors);
+  if(options?.skipUpsert==undefined) {
+    await upsertVectors(index, vectors);
+  }
+}
+
+
+// --------------------------------------------------------
+async function logDataToUpload(metadatas) {
+  
+  const n_metadata = metadatas.length;
+
+	console.log('');
+	console.log('==============================================');
+  console.log('LOG METADATAS TO UPLOAD:');
+  console.log(`     ; n_metadata = ${n_metadata}`);
+
+  const vectors = [];
+
+  const pathname = 'vectors.txt';
+  logStrToUtf8Bom('', pathname, true);
+
+  for (let i = 0; i < n_metadata; i++) {
+    const _metadata = metadatas[i];
+
+    vectors.push({
+      id: `doc-${i}`,
+      metadata: _metadata
+    });
+
+    logStrToUtf8Bom(`\n\n\ndoc-${i} ----------------------`, pathname, false);
+    logStrToUtf8Bom(JSON.stringify(_metadata), pathname, false);
+    
+    const percent = (i / n_metadata) * 100;
+    printProgressBar(percent);
+  }
+  printProgressBar(100);
+  process.stdout.write("\n");
+  console.log(`   done ; n_metadata = ${n_metadata}`);
 }
 
 

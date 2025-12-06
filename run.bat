@@ -1,1 +1,1 @@
-node index.js
+node index.js -skipClone -skipUploadToDb -doLogDataToUpload -skipTestAsking -doLog

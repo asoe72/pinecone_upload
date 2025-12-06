@@ -1,6 +1,8 @@
+import { logStrToUtf8Bom } from './util/log.js';
+
 
 // --------------------------------------------------------
-async function askQuestion(openai, index, query) {
+async function askQuestion(openai, index, query, options) {
   // 쿼리 임베딩
   console.log(`openai.embeddings.create()`);
 
@@ -17,26 +19,37 @@ async function askQuestion(openai, index, query) {
     includeMetadata: true
   });
 
-  const context = results.matches.map(m => m.metadata.text).join("\n");
+  const context = results.matches.map(m => m.metadata.text).join("\n--------------\n");
 
   // ChatGPT에 전달
   console.log(`openai.chat.completions.create()`);
   console.log(`   ; Please, wait about 10~20 seconds...`);
+
+  const messages = [
+    { role: "system", content: "다음 문서를 참고하여 질문에 답하세요." },
+    { role: "user", content: `문서:\n${context}\n\n질문: ${query}` }
+  ];
+
   const completion = await openai.chat.completions.create({
     model: "gpt-4o-mini",
-    messages: [
-      { role: "system", content: "다음 문서를 참고하여 질문에 답하세요." },
-      { role: "user", content: `문서:\n${context}\n\n질문: ${query}` }
-    ]
+    messages
   });
+
+  const answer = completion.choices[0].message.content;
+
+  if(options?.doLog) {
+    const pathname = 'messages.txt';
+    const str = JSON.stringify(messages) + '\n\n\n ANSWER ----------------\n' + answer;
+    logStrToUtf8Bom(str, pathname, true);
+  }
 
   return completion.choices[0].message.content;
 }
 
 
 // --------------------------------------------------------
-export const ask = async (openai, index, question) => {
+export const ask = async (openai, index, question, options) => {
   
-  const answer = await askQuestion(openai, index, question);
+  const answer = await askQuestion(openai, index, question, options);
   console.log("답변:", answer);
 };
