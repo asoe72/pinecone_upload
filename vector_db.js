@@ -102,18 +102,18 @@ async function uploadToPinecone(openai, index, metadatas, options) {
   const vectors = [];
 
   for (let i = 0; i < n_metadata; i++) {
-    const _metadata = metadatas[i];
+    const metadata = metadatas[i];
 
     // embedding 생성
     const emb = await openai.embeddings.create({
       model: "text-embedding-3-small",
-      input: _metadata.bookmarks + '\n' + _metadata.text,
+      input: JSON.stringify(metadata)
     });
 
     vectors.push({
       id: `doc-${i}`,
       values: emb.data[0].embedding,
-      metadata: _metadata
+      metadata
     });
     
     const percent = (i / n_metadata) * 100;
@@ -149,7 +149,7 @@ async function logDataToUpload(metadatas) {
 
     vectors.push({
       id: `doc-${i}`,
-      metadata: _metadata
+      input: JSON.stringify(_metadata.metadata)
     });
 
     logStrToUtf8Bom(`\n\n\ndoc-${i} ----------------------`, pathname, false);

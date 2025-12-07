@@ -15,7 +15,7 @@ const options = {};
 // --------------------------------------------------------
 function procArgs() {
   
-  const str = '-skipClone -skipUpload -doLog';
+  const str = '-skipClone -doLogDataToUpload -doLog';
   const args = str.split(' ');
   //const args = process.argv.slice(2);
   
