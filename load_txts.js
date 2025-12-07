@@ -206,7 +206,7 @@ export function printMetadata(metadata)
 {  
   console.log(`  - metadata.bookSeries=${metadata.bookSeries}`);
   console.log(`  - metadata.bookTitle=${metadata.bookTitle}`);
-  console.log(`  - metadata title=${metadata.title}`);
+  console.log(`  - metadata.chapterTitle=${metadata.chapterTitle}`);
   console.log(`  - metadata.text=${metadata.text.substring(0, 100)}...`);
 }
 
@@ -296,7 +296,7 @@ export function loadMetadataInSummaryItem(bookshelf, bookinfo, item) {
   console.log(`loadMetadataInSummaryItem() : ${rpathname})`);
 
   const metadata = {};
-  metadata.title = item.title;
+  metadata.chapterTitle = item.title;
   metadata.rpathname = item.rpathname;
 
   const pathname = path.join(bookshelf.basepath, rpathname);
