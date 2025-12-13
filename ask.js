@@ -16,12 +16,12 @@ async function askQuestion(openai, index, query, options) {
   // Pinecone 검색
   console.log(`index.query()`);
   const queryResults = await index.query({
-    topK: 3,
+    topK: 5,
     vector: vectorOfQuery,
     includeMetadata: true
   });
 
-  const context = queryResults.matches.map(m => m.metadata.text).join("\n--------------\n");
+  const context = queryResults.matches.map(m => JSON.stringify(m.metadata)).join("\n--------------\n");
 
   // ChatGPT에 전달
   console.log(`openai.chat.completions.create()`);
@@ -56,7 +56,7 @@ async function askQuestion(openai, index, query, options) {
     }
     logStrToUtf8Bom(`답변 (ANSWER) : ${answer}:\n\n\n`, pathname, false);
 
-    calcLogScoreOfExpectedId(index, vectorOfQuery, 'doc-216', pathname);
+    //calcLogScoreOfExpectedId(index, vectorOfQuery, 'doc-216', pathname);
   }
 
   return answer;
