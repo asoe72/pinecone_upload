@@ -1,8 +1,8 @@
 import 'dotenv/config';
 import OpenAI from 'openai';
 import { createIndexOfPineconeIfNot, upload } from './vector_db.js';
-import { testAsking } from './test_asking.js';
-import { cloneOrPullRepos } from './clone_docs.js';
+import { testAsking } from './test/test_asking.js';
+import { hrbook_cloneOrPullRepos } from './loaders/hrbook_clone.js';
 
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -12,10 +12,18 @@ const options = {};
 // --------------------------------------------------------
 /// @brief    node index.js opt1=hello, opt2=99,...
 ///           => options={ opt1: 'hello', opt2: '99', ...}
+///     options:
+///       -skipClone
+///       -skipCreateIndex
+///       -skipUpload
+///       -skipUploadToDb
+///       -doLogDataToUpload
+///       -skipTestAsking
+///       -doFileLog
 // --------------------------------------------------------
 function procArgs() {
   
-  const str = '-skipClone -doLogDataToUpload -doLog';
+  const str = '-skipClone -doLogDataToUpload -doFileLog';
   const args = str.split(' ');
   //const args = process.argv.slice(2);
   
@@ -41,15 +49,6 @@ function printGreeting() {
 // --------------------------------------------------
 // MAIN routine
 
-// options:
-// -skipClone
-// -skipCreateIndex
-// -skipUpload
-// -skipUploadToDb
-// -doLogDataToUpload
-// -skipTestAsking
-// -doLog
-
 procArgs();
 printGreeting();
 
@@ -58,7 +57,7 @@ const basePath = 'R:/git_repo/doc/';
 console.log('options=' + JSON.stringify(options));
 
 if(options.skipClone==undefined) {
-  await cloneOrPullRepos(basePath);
+  await hrbook_cloneOrPullRepos(basePath);
 }
 
 const index = await createIndexOfPineconeIfNot();

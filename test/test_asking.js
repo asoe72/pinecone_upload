@@ -1,5 +1,5 @@
 import { ask } from './ask.js';
-import { printElapsedTime } from './util/elapsed.js';
+import { printElapsedTime } from '../util/elapsed.js';
 
 // --------------------------------------------------------
 export async function testAsking(openai, index, options) {

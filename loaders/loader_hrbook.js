@@ -1,12 +1,10 @@
 import path from "path";
 import fs from "fs";
-import { encoding_for_model } from "@dqbd/tiktoken";
-import { fetchHRBookInfos } from './bookinfos.js';
-import { loadSummary } from './summary.js';
-import { colorStrRed } from './util/color_str.js';
+import { fetchHRBookInfos } from './hrbookinfos.js';
+import { loadSummary } from '../summary.js';
+import { convToWordJoinedText, loadText, splitByTokens } from './load_txts.js';
+import { colorStrRed } from '../util/color_str.js';
 
-
-const enc = encoding_for_model("gpt-4o-mini");
 
 // --------------------------------------------------------
 /// @param[in]    pathnameBookshelves   e.g. '_test/bookshelves.json'
@@ -45,7 +43,7 @@ export async function loadMetadatasFromBookshelves(pathnameBookshelves) {
 //                  - exts        대상 확장자. e.g. ['txt', 'md', 'json']
 /// @return       metadatas
 // --------------------------------------------------------
-export async function loadMetadatasInBookshelf(bookshelf) {
+async function loadMetadatasInBookshelf(bookshelf) {
 
   if (bookshelf.type == 'folders') {
     return await loadMetadatasInBookshelf_Folders(bookshelf);
@@ -64,7 +62,7 @@ export async function loadMetadatasInBookshelf(bookshelf) {
 //                  - exts        대상 확장자. e.g. ['txt', 'md', 'json']
 /// @return       metadatas
 // --------------------------------------------------------
-export async function loadMetadatasInBookshelf_Folders(bookshelf) {
+async function loadMetadatasInBookshelf_Folders(bookshelf) {
 
   const metadatas = [];
 
@@ -120,7 +118,7 @@ function filterBookinfo(bookinfo) {
 /// @param[in]    bookshelf
 /// @return       metadatas
 // --------------------------------------------------------
-export function loadMetadatasInBook(bookshelf, bookinfo) {
+function loadMetadatasInBook(bookshelf, bookinfo) {
 
   const _bookFolderName = bookFolderName(bookinfo);    // e.g. 'doc-add-axes-korean'
 
@@ -192,7 +190,7 @@ function bookinfoFromBookPath(bookpath) {
 
 
 // --------------------------------------------------------
-export function copyMetadataFromBookInfo(metadata, bookinfo)
+function copyMetadataFromBookInfo(metadata, bookinfo)
 {
   if(!bookinfo) return;
   metadata.langCode = bookinfo.langCode;
@@ -202,7 +200,7 @@ export function copyMetadataFromBookInfo(metadata, bookinfo)
 
 
 // --------------------------------------------------------
-export function printMetadata(metadata)
+function printMetadata(metadata)
 {  
   console.log(`  - metadata.bookSeries=${metadata.bookSeries}`);
   console.log(`  - metadata.bookTitle=${metadata.bookTitle}`);
@@ -215,7 +213,7 @@ export function printMetadata(metadata)
 /// @brief    metadata.text를 chunk 크기로 나눠, 여러 metadata로 복제하여,
 ///           metadatas 배열에 push
 // --------------------------------------------------------
-export function splitMetadataAndPush(metadatas, metadata) {
+function splitMetadataAndPush(metadatas, metadata) {
  
   const chunks = splitByTokens(metadata.text);
 
@@ -252,27 +250,6 @@ function filteredBookmarks(bookmarks, offsetSt, len) {
 
 
 // --------------------------------------------------------
-/// @param[in,out]   bookmarks
-/// @param[in]       lastBookmark  
-/// @return   updatedLastBookmark
-// --------------------------------------------------------
-function updateOrApplyLastBookmark(bookmarks, lastBookmark) {
-
-  let updatedLastBookmark = lastBookmark;
-
-  if(bookmarks.length == 0) {
-    bookmarks.push({...lastBookmark});    // bookmark가 하나도 없으면, 마지막 bookmark의 사본 넣어줌
-  }
-  else {
-    const lastIdx = bookmarks.length - 1;
-    updatedLastBookmark = {...bookmarks[lastIdx]};    // bookmark들이 있으면, 마지막 bookmark의 사본 보관
-  }
-
-  return updatedLastBookmark;
-}
-
-
-// --------------------------------------------------------
 /// @param[in]   bookshelf
 /// @param[in]   bookinfo
 /// @param[in]   folderName     e.g. '1-Introduction'
@@ -287,7 +264,7 @@ function updateOrApplyLastBookmark(bookmarks, lastBookmark) {
 ///             text: "# 2. 운전\n\n운전은 로봇에게 작업 내용을...",
 ///           }
 // --------------------------------------------------------
-export function loadMetadataInSummaryItem(bookshelf, bookinfo, item) {
+function loadMetadataInSummaryItem(bookshelf, bookinfo, item) {
 
   const _bookFolderName = bookFolderName(bookinfo);    // e.g. 'doc-add-axes-korean'
   const rpathname = path.join(_bookFolderName, item.rpathname);
@@ -321,7 +298,7 @@ function finalizeMetadatas(bookinfo, metadatas) {
 /// @param[in]   rpath      e.g. '3-Setup/1-robottype/robottype.md'
 /// @return     e.g. `https://hrbook-hrc.web.app/#/view/doc-add-axes/korean/3-Setup/1-robottype/robottype`
 // --------------------------------------------------------
-export function makeSourceUrl(bookinfo, rpathname) {
+function makeSourceUrl(bookinfo, rpathname) {
 
   const parts = rpathname.split(/[\\/]/);
   if(parts.length == 0) return '';
@@ -333,74 +310,4 @@ export function makeSourceUrl(bookinfo, rpathname) {
   
   const source = `https://hrbook-hrc.web.app/#/view/` + subPath;
   return source;
-}
-
-
-// --------------------------------------------------------
-export function readTitleOfMdFile(pathname) {
-
-  try {
-    const text = loadText(pathname);
-    //console.log(`text=${text}`);
-  
-    // 정규식으로 제목(#) 추출
-    const lines = text.split('/\r?\n/');
-
-    for (const line of lines) {
-      const match = line.match(/#\s*(.*)/);
-      if (match) {
-        return match[1].trim();
-      }
-    }
-  }
-  catch(err) {
-  }
-  console.log(`no title`);
-  
-  return '';
-}
-
-
-// --------------------------------------------------------
-function convToWordJoinedText(text) {
-
-  const words = text.split(/\s+/);
-  return words.join(" ").trim();  
-}
-
-
-// --------------------------------------------------------
-function loadText(pathname) {
-
-  console.log(`      loadTextFile(${pathname});`);
-  try {
-    const text = fs.readFileSync(pathname, "utf-8");
-    const textNoBom = text.replace(/^\uFEFF/, '');  // UTF-8 BOM 제거
-    return textNoBom;
-  } catch(err) {
-    console.error(colorStrRed(`Failed to read file ${pathname}\n`), err.message);
-    return '';
-  }
-}
-
-
-// --------------------------------------------------------
-function splitByTokens(text, maxTokens = 4096, overlap = 400) {
-
-  const tokens = enc.encode(text);
-  const chunks = [];
-
-  let start = 0;
-  while (start < tokens.length) {
-    const end = Math.min(start + maxTokens, tokens.length);
-    const chunkTokens = tokens.slice(start, end);
-    
-    const decoder = new TextDecoder("utf-8");
-    const chunkText = decoder.decode(enc.decode(chunkTokens));
-
-    chunks.push(chunkText);
-    start += (maxTokens - overlap);
-  }
-
-  return chunks;
 }

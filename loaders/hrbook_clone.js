@@ -1,7 +1,7 @@
 import { exec } from "child_process";
-import { fetchHRBookInfos } from './bookinfos.js';
-import { startDotProgress } from './util/progress_bar.js';
-import { colorStrGreen, colorStrYellow, colorStrCyan } from './util/color_str.js';
+import { fetchHRBookInfos } from './hrbookinfos.js';
+import { startDotProgress } from '../util/progress_bar.js';
+import { colorStrGreen, colorStrYellow, colorStrCyan } from '../util/color_str.js';
 import path from "path";
 import fs from "fs";
 
@@ -10,7 +10,7 @@ import fs from "fs";
 /// @param[in]    basePath		'R:/hrchatbot2_docs/hrbook/'
 /// @return		처리한 repo 개수
 // --------------------------------------------------------
-export async function cloneOrPullRepos(basePath) {
+export async function hrbook_cloneOrPullRepos(basePath) {
 	
 	const baseUrl = 'https://github.com/hyundai-robotics/';
 	const bookinfos = await fetchHRBookInfos();

@@ -1,5 +1,5 @@
 import { Pinecone } from '@pinecone-database/pinecone';
-import { loadMetadatasFromBookshelves } from './load_txts.js';
+import { loadMetadatasFromBookshelves } from './loaders/loader_hrbook.js';
 import { printProgressBar } from './util/progress_bar.js';
 import { printElapsedTime } from './util/elapsed.js';
 import { logStrToUtf8Bom } from './util/log.js';
@@ -54,8 +54,8 @@ export const upload = async (openai, index, pathnameBookshelves, options) => {
   const metadatas = await loadMetadatasFromBookshelves(pathnameBookshelves);
 
   // 개수 제한 (시험용)
-  //const n_max = 20;
-  //metadatas.length = n_max;
+  const n_max = 20;
+  metadatas.length = n_max;
 
   // vector DB에 upload
   if(options?.skipUploadToDb==undefined) {
