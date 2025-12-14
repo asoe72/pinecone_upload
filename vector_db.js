@@ -1,5 +1,5 @@
 import { Pinecone } from '@pinecone-database/pinecone';
-import { loadMetadatasFromBookshelves } from './loaders/loader_hrbook.js';
+import { loadMetadatasAll } from './loaders/loader.js';
 import { printProgressBar } from './util/progress_bar.js';
 import { printElapsedTime } from './util/elapsed.js';
 import { logStrToUtf8Bom } from './util/log.js';
@@ -44,18 +44,18 @@ export async function createIndexOfPineconeIfNot() {
 // --------------------------------------------------------
 /// @brief   최초 1회 문서 업로드 (이미 업로드 했다면 생략 가능)
 // --------------------------------------------------------
-export const upload = async (openai, index, pathnameBookshelves, options) => {
+export const upload = async (openai, index, options) => {
 
   console.log('upload');
 
   const start = Date.now();
 
   // metadatas 생성
-  const metadatas = await loadMetadatasFromBookshelves(pathnameBookshelves);
+  const metadatas = await loadMetadatasAll();
 
   // 개수 제한 (시험용)
-  //const n_max = 20;
-  //metadatas.length = n_max;
+  const n_max = 20;
+  metadatas.length = n_max;
 
   // vector DB에 upload
   if(options?.skipUploadToDb==undefined) {

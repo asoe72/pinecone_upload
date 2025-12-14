@@ -1,7 +1,7 @@
 import { exec } from "child_process";
 import { fetchHRBookInfos } from './hrbookinfos.js';
-import { startDotProgress } from '../util/progress_bar.js';
-import { colorStrGreen, colorStrYellow, colorStrCyan } from '../util/color_str.js';
+import { startDotProgress } from '../../util/progress_bar.js';
+import { colorStrGreen, colorStrYellow, colorStrCyan } from '../../util/color_str.js';
 import path from "path";
 import fs from "fs";
 

@@ -1,68 +1,16 @@
 import path from "path";
 import fs from "fs";
 import { fetchHRBookInfos } from './hrbookinfos.js';
-import { loadSummary } from '../summary.js';
-import { convToWordJoinedText, loadText, splitByTokens } from './load_txts.js';
-import { colorStrRed } from '../util/color_str.js';
+import { loadSummary } from './hrbook_summary.js';
+import { convToWordJoinedText, loadText, splitByTokens } from '../load_txts.js';
+import { colorStrRed } from '../../util/color_str.js';
 
 
 // --------------------------------------------------------
-/// @param[in]    pathnameBookshelves   e.g. '_test/bookshelves.json'
+/// @param[in]    basepath    'R:/git_repo/doc'
 /// @return       metadatas
 // --------------------------------------------------------
-export async function loadMetadatasFromBookshelves(pathnameBookshelves) {
-
-  console.log('');
-  console.log('==============================================');
-  console.log('[1/3] LOADING BOOKSHELVES:');
-
-  try {
-    const metadatas = [];
-    
-    const data = fs.readFileSync(pathnameBookshelves, 'utf-8');
-
-    const bookshelves = JSON.parse(data);
-
-    for(const bookshelf of bookshelves) {
-      const metadatasSub = await loadMetadatasInBookshelf(bookshelf)
-      metadatas.push(...metadatasSub);
-    }
-    return metadatas;
-  }
-  catch(err) {
-    console.error(colorStrRed(`Failed to read or parse ${pathnameBookshelves}\n`), err.message);
-    return -1;
-  }
-}
-
-
-// --------------------------------------------------------
-/// @param[in]    bookshelf
-//                  - basepath    'R:/git_repo/doc'
-//                  - type        'folders' or 'files'
-//                  - exts        대상 확장자. e.g. ['txt', 'md', 'json']
-/// @return       metadatas
-// --------------------------------------------------------
-async function loadMetadatasInBookshelf(bookshelf) {
-
-  if (bookshelf.type == 'folders') {
-    return await loadMetadatasInBookshelf_Folders(bookshelf);
-  }
-  else if (bookshelf.type == 'files') {
-    return [];    //loadMetadatasInGroup_Files(bookshelf);
-  }
-}
-
-
-// --------------------------------------------------------
-/// @param[in]    bookshelf
-//                  - basepath    'R:/git_repo/doc'
-//                  - type        'folders' or 'files'
-//                  - excludeFiles  (optional) e.g. ["book.md", "bookinfo.json"..]
-//                  - exts        대상 확장자. e.g. ['txt', 'md', 'json']
-/// @return       metadatas
-// --------------------------------------------------------
-async function loadMetadatasInBookshelf_Folders(bookshelf) {
+export async function loadMetadatas_HRBook(basepath) {
 
   const metadatas = [];
 
@@ -86,7 +34,7 @@ async function loadMetadatasInBookshelf_Folders(bookshelf) {
 
     //console.log(`book_id:${bookinfo.book_id}, ver_id:${bookinfo.ver_id}, shelf_ids:${JSON.stringify(bookinfo.shelf_ids)}`);
 
-    const metadatasSub = loadMetadatasInBook(bookshelf, bookinfo);
+    const metadatasSub = loadMetadatasInBook(basepath, bookinfo);
     if(metadatasSub == null) {
       n_skip++;
       continue;
@@ -115,17 +63,17 @@ function filterBookinfo(bookinfo) {
 
 
 // --------------------------------------------------------
-/// @param[in]    bookshelf
+/// @param[in]    basepath
 /// @return       metadatas
 // --------------------------------------------------------
-function loadMetadatasInBook(bookshelf, bookinfo) {
+function loadMetadatasInBook(basepath, bookinfo) {
 
   const _bookFolderName = bookFolderName(bookinfo);    // e.g. 'doc-add-axes-korean'
 
   console.log('==============================================');
   console.log(`loadMetadatasInBook(${_bookFolderName})`);
 
-  const pathBook = path.join(bookshelf.basepath, _bookFolderName);
+  const pathBook = path.join(basepath, _bookFolderName);
   console.log(`pathBook=${pathBook}`);
 
   // 책 제목 등 정보
@@ -141,7 +89,7 @@ function loadMetadatasInBook(bookshelf, bookinfo) {
   // { title, path, index }
   const items = loadSummary(pathBook);
   for (const item of items) {
-    const metadata = loadMetadataInSummaryItem(bookshelf, bookinfo, item);
+    const metadata = loadMetadataInSummaryItem(basepath, bookinfo, item);
     copyMetadataFromBookInfo(metadata, bookinfo);   // 책 정보를 각 metadata에 첨부한다.
     printMetadata(metadata);
 
@@ -250,7 +198,7 @@ function filteredBookmarks(bookmarks, offsetSt, len) {
 
 
 // --------------------------------------------------------
-/// @param[in]   bookshelf
+/// @param[in]   basepath
 /// @param[in]   bookinfo
 /// @param[in]   folderName     e.g. '1-Introduction'
 /// @param[in]   rpathChapter      e.g. 'doc-add-axes/1-Introduction'
@@ -264,7 +212,7 @@ function filteredBookmarks(bookmarks, offsetSt, len) {
 ///             text: "# 2. 운전\n\n운전은 로봇에게 작업 내용을...",
 ///           }
 // --------------------------------------------------------
-function loadMetadataInSummaryItem(bookshelf, bookinfo, item) {
+function loadMetadataInSummaryItem(basepath, bookinfo, item) {
 
   const _bookFolderName = bookFolderName(bookinfo);    // e.g. 'doc-add-axes-korean'
   const rpathname = path.join(_bookFolderName, item.rpathname);
@@ -276,7 +224,7 @@ function loadMetadataInSummaryItem(bookshelf, bookinfo, item) {
   metadata.chapterTitle = item.title;
   metadata.rpathname = item.rpathname;
 
-  const pathname = path.join(bookshelf.basepath, rpathname);
+  const pathname = path.join(basepath, rpathname);
   
   metadata.text = convToWordJoinedText(loadText(pathname));
 
