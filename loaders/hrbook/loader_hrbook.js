@@ -88,11 +88,13 @@ function loadMetadatasInBook(basepath, bookinfo) {
 
   // { title, path, index }
   const items = loadSummary(pathBook);
+  let shortMetaData = null;
   for (const item of items) {
     const metadata = loadMetadataInSummaryItem(basepath, bookinfo, item);
     copyMetadataFromBookInfo(metadata, bookinfo);   // 책 정보를 각 metadata에 첨부한다.
     printMetadata(metadata);
 
+    shortMetaData = mergeShortMetadata(shortMetaData, metadata);
     splitMetadataAndPush(metadatas, metadata);
   }
 
@@ -154,6 +156,22 @@ function printMetadata(metadata)
   console.log(`  - metadata.bookTitle=${metadata.bookTitle}`);
   console.log(`  - metadata.chapterTitle=${metadata.chapterTitle}`);
   console.log(`  - metadata.text=${metadata.text.substring(0, 100)}...`);
+}
+
+
+// --------------------------------------------------------
+/// @return   새로운 shortMetaData
+/// @brief    metadatatext가 너무 짧으면 (가령 제목만 있는 section), 다음 metadata의 text를 덧붙인다.
+// --------------------------------------------------------
+function mergeShortMetadata(shortMetaData, metadata) {
+
+ if(shortMetaData) {
+    shortMetaData.text += metadata.text;
+  }
+  if(metadata.text.length < 100) {
+    return metadata;
+  }
+  return null;
 }
 
 

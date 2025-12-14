@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import OpenAI from 'openai';
+import pkg from './package.json' assert { type: 'json' };
 import { createIndexOfPineconeIfNot, upload } from './vector_db.js';
 import { testAsking } from './test/test_asking.js';
 import { prepareDocs } from './loaders/prepare_docs.js';
@@ -41,7 +42,7 @@ function printGreeting() {
   console.log('--------------------------------------------------');
   console.log('pinecone_upload');
   console.log('programmed by Choi, Won-hyuk');
-  console.log('v1.5.1');
+  console.log(`v${pkg.version}`);
   console.log('--------------------------------------------------');
 }
 
