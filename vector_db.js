@@ -54,8 +54,8 @@ export const upload = async (openai, index, pathnameBookshelves, options) => {
   const metadatas = await loadMetadatasFromBookshelves(pathnameBookshelves);
 
   // 개수 제한 (시험용)
-  const n_max = 20;
-  metadatas.length = n_max;
+  //const n_max = 20;
+  //metadatas.length = n_max;
 
   // vector DB에 upload
   if(options?.skipUploadToDb==undefined) {
