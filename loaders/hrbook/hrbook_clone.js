@@ -29,19 +29,17 @@ export async function hrbook_cloneOrPullRepos(basePath) {
 		idx++;
 		//if(idx < 50) continue;
 		//if(idx > 60) break;
-		
-		const targetFolderName = info.book_id + '-' + info.ver_id;	// e.g. 'doc-spot-weld-korean'
+			
+		const targetFolderName = info.book_id;	// e.g. 'doc-spot-weld'
 		
 		const url = baseUrl + info.book_id + '.git';
 		const branch = info.ver_id;
+		const title = info.title;
 
-		printCloneOrPullRepo(idx, idxMax, basePath, targetFolderName, url, branch);
-
-		if (info.url) {
-			console.log(': not git repo => ' + colorStrYellow('SKIP'));
-			continue;
-		}		
-		
+		printCloneOrPullRepo(idx, idxMax, basePath, targetFolderName, url, branch, title);
+	
+		if(filterBookinfo(info) == false) continue;
+				
 		await cloneOrPullRepo(basePath, targetFolderName, url, branch);
 	}
 
@@ -50,7 +48,29 @@ export async function hrbook_cloneOrPullRepos(basePath) {
 
 
 // --------------------------------------------------------
-function printCloneOrPullRepo(idx, idxMax, basePath, targetFolderName, url, branch) {
+function filterBookinfo(bookinfo) {
+  
+  // PDF 등은 skip
+	if (bookinfo.url) {
+		console.log(': not git repo => ' + colorStrYellow('SKIP'));
+		return false;
+	}
+	// 한글버전만 포함,
+	if(bookinfo.ver_id.includes('ko') == false) {
+		console.log(': not Korean language => ' + colorStrYellow('SKIP'));
+		return false;
+	}
+	if(bookinfo.ver_id.includes('tp600')) {
+		console.log(': TP600 => ' + colorStrYellow('SKIP'));
+		return false;            // tp600 제외
+	}
+    
+  return true;
+}
+
+
+// --------------------------------------------------------
+function printCloneOrPullRepo(idx, idxMax, basePath, targetFolderName, url, branch, title) {
 
 	const repoPath = path.join(basePath, targetFolderName);
 
@@ -60,15 +80,16 @@ function printCloneOrPullRepo(idx, idxMax, basePath, targetFolderName, url, bran
 	console.log(
 `	- repoPath=${repoPath}
 	- url=${url}
-	- branch=${branch}\n`);
+	- branch=${branch}
+	- title=${title}`);
 }
 
 
 // --------------------------------------------------------
 /// @param[in]    basePath		'R:/hrchatbot2_docs/hrbook/'
-/// @param[in]    targetFolderName		'doc-spot-weld-korean'
+/// @param[in]    targetFolderName		'doc-spot-weld'
 /// @param[in]    repoUrl			'https://github.com/hyundai-robotics/doc-spot-weld.git'
-/// @param[in]    branch			'korean'
+/// @param[in]    branch			'ko'
 /// @return
 // 			-		-1                   skipped (has local change)
 // 			-		{ stdout, stderr }   pulled or cloned
@@ -105,7 +126,7 @@ async function cloneOrPullRepo(basePath, targetFolderName, repoUrl, branch) {
 
 
 // --------------------------------------------------------
-/// @param[in]    repoPath		'R:/hrchatbot2_docs/hrbook/doc-spot-weld-korean'
+/// @param[in]    repoPath		'R:/hrchatbot2_docs/hrbook/doc-spot-weld'
 /// @return				로컬 변경(unstaged or staged)이 있는지 여부
 // --------------------------------------------------------
 function hasLocalChanges(repoPath) {
@@ -122,7 +143,7 @@ function hasLocalChanges(repoPath) {
 
 
 // --------------------------------------------------------
-/// @param[in]    repoPath		'R:/hrchatbot2_docs/hrbook/doc-spot-weld-korean'
+/// @param[in]    repoPath		'R:/hrchatbot2_docs/hrbook/doc-spot-weld'
 /// @return				Promise, { stdout, stderr }
 // --------------------------------------------------------
 function pullRepo(repoPath) {
@@ -147,9 +168,9 @@ function pullRepo(repoPath) {
 
 // --------------------------------------------------------
 /// @param[in]    basePath		'R:/hrchatbot2_docs/hrbook/'
-/// @param[in]    targetFolderName		'doc-spot-weld-korean'
+/// @param[in]    targetFolderName		'doc-spot-weld'
 /// @param[in]    repoUrl			'https://github.com/hyundai-robotics/doc-spot-weld.git'
-/// @param[in]    branch			'korean'
+/// @param[in]    branch			'ko'
 /// @return				Promise, { stdout, stderr }
 // --------------------------------------------------------
 function cloneRepo(basePath, targetFolderName, repoUrl, branch) {
@@ -157,7 +178,8 @@ function cloneRepo(basePath, targetFolderName, repoUrl, branch) {
 	return new Promise((resolve, reject) => {
 
 		// basePath가 있을 경우 해당 경로로 이동해서 clone 실행
-		const cmd = `git -C "${basePath}" clone -b "${branch}" --single-branch "${repoUrl}" "${targetFolderName}"`;
+		//const cmd = `git -C "${basePath}" clone -b "${branch}" --single-branch "${repoUrl}" "${targetFolderName}"`;
+		const cmd = `git -C "${basePath}" clone -b "${branch}" "${repoUrl}" "${targetFolderName}"`;
 
 		process.stdout.write("  cloning : ");
 		const stopDotProgress = startDotProgress();

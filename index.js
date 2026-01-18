@@ -24,7 +24,8 @@ const options = {};
 // --------------------------------------------------------
 function procArgs() {
   
-  const str = '-skipPrepare -doLogDataToUpload -doFileLog';
+  //const str = '-skipPrepare -doLogDataToUpload -doFileLog';
+  const str = '-doLogDataToUpload -doFileLog';
   const args = str.split(' ');
   //const args = process.argv.slice(2);
   
@@ -48,25 +49,31 @@ function printGreeting() {
 
 
 // --------------------------------------------------
+async function main() {
+
+  procArgs();
+  printGreeting();
+
+  console.log('options=' + JSON.stringify(options));
+
+  if(options.skipPrepare==undefined) {
+    await prepareDocs();
+  }
+
+  const index = await createIndexOfPineconeIfNot();
+
+  if(options.skipUpload==undefined) {
+    await upload(openai, index, options);
+  }
+
+  if(options.skipTestAsking==undefined) {
+    await testAsking(openai, index, options);
+  }
+
+  console.log('options=' + JSON.stringify(options));
+}
+
+
+// --------------------------------------------------
 // MAIN routine
-
-procArgs();
-printGreeting();
-
-console.log('options=' + JSON.stringify(options));
-
-if(options.skipPrepare==undefined) {
-  await prepareDocs();
-}
-
-const index = await createIndexOfPineconeIfNot();
-
-if(options.skipUpload==undefined) {
-  await upload(openai, index, options);
-}
-
-if(options.skipTestAsking==undefined) {
-  await testAsking(openai, index, options);
-}
-
-console.log('options=' + JSON.stringify(options));
+await main();

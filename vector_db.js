@@ -87,7 +87,7 @@ export const upload = async (openai, index, options) => {
 ///           e.g.
 ///           { "text": "# 2. 운전\n\n운전은 로봇에게 작업 내용을...",
 ///             "title": "2. 운전"
-///             "source": e.g. "https://hrbook-hrc.web.app/#/view/doc-hi6-operation/korean-tp630/2-operation/README"
+///             "source": e.g. "https://hrbook-hrc.web.app/#/view/doc-hi6-operation/ko-tp630/2-operation/README"
 ///           }
 // --------------------------------------------------------
 async function uploadToPinecone(openai, index, metadatas, options) {

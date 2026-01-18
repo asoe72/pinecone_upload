@@ -54,10 +54,11 @@ export async function loadMetadatas_HRBook(basepath) {
 // --------------------------------------------------------
 function filterBookinfo(bookinfo) {
 
-  if(bookinfo.ver_id.includes('korean') == false) return false;  // 한글버전만 포함,
+  if(bookinfo.url) return false;  // PDF 등은 skip
+  if(bookinfo.ver_id.includes('ko') == false) return false;  // 한글버전만 포함,
   if(bookinfo.ver_id.includes('tp600')) return false;            // tp600 제외
-  if(bookinfo.shelf_ids.includes('hi7-cont')) return false;      // hi7은 아직 제외,
-  
+  if(bookinfo.variables?.cont_model == 'Hi7') return false;      // Hi7 제외
+    
   return true;
 }
 
@@ -68,7 +69,7 @@ function filterBookinfo(bookinfo) {
 // --------------------------------------------------------
 function loadMetadatasInBook(basepath, bookinfo) {
 
-  const _bookFolderName = bookFolderName(bookinfo);    // e.g. 'doc-add-axes-korean'
+  const _bookFolderName = bookFolderName(bookinfo);    // e.g. 'doc-add-axes'
 
   console.log('==============================================');
   console.log(`loadMetadatasInBook(${_bookFolderName})`);
@@ -105,11 +106,11 @@ function loadMetadatasInBook(basepath, bookinfo) {
 
 
 // --------------------------------------------------------
-/// @return       e.g. 'doc-add-axes-korean'
+/// @return       e.g. 'doc-add-axes'
 // --------------------------------------------------------
 function bookFolderName(bookinfo) {
 
-  return bookinfo.book_id + '-' + bookinfo.ver_id;
+  return bookinfo.book_id;
 }
 
 
@@ -232,7 +233,7 @@ function filteredBookmarks(bookmarks, offsetSt, len) {
 // --------------------------------------------------------
 function loadMetadataInSummaryItem(basepath, bookinfo, item) {
 
-  const _bookFolderName = bookFolderName(bookinfo);    // e.g. 'doc-add-axes-korean'
+  const _bookFolderName = bookFolderName(bookinfo);    // e.g. 'doc-add-axes'
   const rpathname = path.join(_bookFolderName, item.rpathname);
 
   console.log('------------------------------------');
@@ -244,9 +245,35 @@ function loadMetadataInSummaryItem(basepath, bookinfo, item) {
 
   const pathname = path.join(basepath, rpathname);
   
-  metadata.text = convToWordJoinedText(loadText(pathname));
+  const str = convToWordJoinedText(loadText(pathname));
+  metadata.text = replaceVariablesToValues(bookinfo, str);
 
   return metadata;
+}
+
+
+///@param[in]	str		e.g.
+function replaceVariablesToValues(info, str)
+{
+	//console.log('replaceVariablesToValues');
+	//console.log(JSON.stringify(info.variables));
+	let modifiedStr = str;
+	const vars = info.variables;
+	for(const vname in vars) {
+		modifiedStr = replaceVariablesToValue(modifiedStr, vname, vars[vname]);
+	}
+	
+	return modifiedStr;
+}
+
+
+///@param[in]	str		e.g.
+///@param[in]	var_name		e.g. 'cont_model'
+///@param[in]	var_value		e.g. 'Hi7'
+function replaceVariablesToValue(str, var_name, var_value)
+{
+	const pattern = new RegExp(`\\$\\{${var_name}\\}`, 'g');
+	return str.replace(pattern, var_value);
 }
 
 
@@ -262,7 +289,7 @@ function finalizeMetadatas(bookinfo, metadatas) {
 
 // --------------------------------------------------------
 /// @param[in]   rpath      e.g. '3-Setup/1-robottype/robottype.md'
-/// @return     e.g. `https://hrbook-hrc.web.app/#/view/doc-add-axes/korean/3-Setup/1-robottype/robottype`
+/// @return     e.g. `https://hrbook-hrc.web.app/#/view/doc-add-axes/ko/3-Setup/1-robottype/robottype`
 // --------------------------------------------------------
 function makeSourceUrl(bookinfo, rpathname) {
 
@@ -272,8 +299,23 @@ function makeSourceUrl(bookinfo, rpathname) {
   let rpath = parts.join('/');
   rpath = rpath.replace(/\.md$/i, '');    // 맨 끝 .md 제거
 
-  const subPath = `${bookinfo.book_id}/${bookinfo.ver_id}/${rpath}`;
+  const strQuery = makeStrQuery(bookinfo);
+
+  const subPath = `${bookinfo.book_id}/${bookinfo.ver_id}/${rpath}${strQuery}`;
   
   const source = `https://hrbook-hrc.web.app/#/view/` + subPath;
   return source;
+}
+
+
+// --------------------------------------------------------
+/// @return     e.g. '?cont_model=Hi6&key2=val2'
+// --------------------------------------------------------
+function makeStrQuery(bookinfo) {
+  if(bookinfo.variables == undefined) return '';
+  let vars = [];
+  for(const [key, val] of Object.entries(bookinfo.variables)) {
+    vars.push(`${key}=${val}`);
+  }
+  return '?' + vars.join('&');
 }
