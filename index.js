@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import OpenAI from 'openai';
-import pkg from './package.json' assert { type: 'json' };
+import pkg from './package.json' with { type: 'json' };
 import { createIndexOfPineconeIfNot, upload } from './vector_db.js';
 import { testAsking } from './test/test_asking.js';
 import { prepareDocs } from './loaders/prepare_docs.js';
